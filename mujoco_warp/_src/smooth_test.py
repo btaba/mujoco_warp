@@ -67,7 +67,7 @@ class SmoothTest(parameterized.TestCase):
     for arr in (d.xanchor, d.xaxis, d.xquat, d.xpos):
       arr.zero_()
 
-    mjwarp.kinematics_(
+    mjwarp._src.smooth.kinematics_(
       # Model Inputs
       m.body_tree,
       m.qpos0,
