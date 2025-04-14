@@ -233,9 +233,6 @@ def kinematics_(
     jnt_axis: wp.array(dtype=wp.vec3),
     # Data Inputs
     qpos: wp.array2d(dtype=float),
-    xpos: wp.array2d(dtype=wp.vec3),
-    xquat: wp.array2d(dtype=wp.quat),
-    xmat: wp.array2d(dtype=wp.mat33),
     # Data Outputs
     xpos: wp.array2d(dtype=wp.vec3),
     xquat: wp.array2d(dtype=wp.quat),
