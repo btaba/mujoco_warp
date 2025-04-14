@@ -60,6 +60,63 @@ class SmoothTest(parameterized.TestCase):
     _assert_eq(d.site_xpos.numpy()[0], mjd.site_xpos, "site_xpos")
     _assert_eq(d.site_xmat.numpy()[0], mjd.site_xmat.reshape((-1, 3, 3)), "site_xmat")
 
+  def test_kinematics_(self):
+    """Tests kinematics_."""
+    _, mjd, m, d = test_util.fixture("pendula.xml")
+
+    for arr in (d.xanchor, d.xaxis, d.xquat, d.xpos):
+      arr.zero_()
+
+    mjwarp.kinematics_(
+      # Model Inputs
+      m.body_tree,
+      m.qpos0,
+      m.body_parentid,
+      m.body_jntadr,
+      m.body_jntnum,
+      m.body_pos,
+      m.body_quat,
+      m.body_ipos,
+      m.body_iquat,
+      m.body_treeadr,
+      m.jnt_type,
+      m.jnt_qposadr,
+      m.jnt_pos,
+      m.jnt_axis,
+      m.geom_bodyid,
+      m.geom_pos,
+      m.geom_quat,
+      m.site_bodyid,
+      m.site_pos,
+      m.site_quat,
+      # Data Inputs
+      d.qpos,
+      # Outputs
+      d.xpos,
+      d.xquat,
+      d.xmat,
+      d.xipos,
+      d.ximat,
+      d.xanchor,
+      d.xaxis,
+      d.geom_xpos,
+      d.geom_xmat,
+      d.site_xpos,
+      d.site_xmat,
+    )
+
+    _assert_eq(d.xanchor.numpy()[0], mjd.xanchor, "xanchor")
+    _assert_eq(d.xaxis.numpy()[0], mjd.xaxis, "xaxis")
+    _assert_eq(d.xpos.numpy()[0], mjd.xpos, "xpos")
+    _assert_eq(d.xquat.numpy()[0], mjd.xquat, "xquat")
+    _assert_eq(d.xmat.numpy()[0], mjd.xmat.reshape((-1, 3, 3)), "xmat")
+    _assert_eq(d.xipos.numpy()[0], mjd.xipos, "xipos")
+    _assert_eq(d.ximat.numpy()[0], mjd.ximat.reshape((-1, 3, 3)), "ximat")
+    _assert_eq(d.geom_xpos.numpy()[0], mjd.geom_xpos, "geom_xpos")
+    _assert_eq(d.geom_xmat.numpy()[0], mjd.geom_xmat.reshape((-1, 3, 3)), "geom_xmat")
+    _assert_eq(d.site_xpos.numpy()[0], mjd.site_xpos, "site_xpos")
+    _assert_eq(d.site_xmat.numpy()[0], mjd.site_xmat.reshape((-1, 3, 3)), "site_xmat")
+
   def test_com_pos(self):
     """Tests com_pos."""
     _, mjd, m, d = test_util.fixture("pendula.xml")
