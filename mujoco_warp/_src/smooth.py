@@ -154,6 +154,165 @@ def kinematics(m: Model, d: Data):
 
 
 
+@kernel
+def _root(
+  xpos: wp.array2d(dtype=wp.vec3),
+  xquat: wp.array2d(dtype=wp.quat),
+  xmat: wp.array2d(dtype=wp.mat33),
+  xipos: wp.array2d(dtype=wp.vec3),
+  ximat: wp.array2d(dtype=wp.mat33),
+):
+  worldid = wp.tid()
+  xpos[worldid, 0] = wp.vec3(0.0)
+  xquat[worldid, 0] = wp.quat(1.0, 0.0, 0.0, 0.0)
+  xipos[worldid, 0] = wp.vec3(0.0)
+  xmat[worldid, 0] = wp.identity(n=3, dtype=wp.float32)
+  ximat[worldid, 0] = wp.identity(n=3, dtype=wp.float32)
+
+@kernel
+def _level(
+  # Model Inputs
+  body_tree: wp.array(dtype=int),
+  qpos0: wp.array(dtype=float),
+  body_parentid: wp.array(dtype=int),
+  body_jntadr: wp.array(dtype=int),
+  body_jntnum: wp.array(dtype=int),
+  body_pos: wp.array(dtype=wp.vec3),
+  body_quat: wp.array(dtype=wp.quat),
+  body_ipos: wp.array(dtype=wp.vec3),
+  body_iquat: wp.array(dtype=wp.quat),
+  jnt_type: wp.array(dtype=int),
+  jnt_qposadr: wp.array(dtype=int),
+  jnt_pos: wp.array(dtype=wp.vec3),
+  jnt_axis: wp.array(dtype=wp.vec3),
+  # Data Inputs
+  qpos_in: wp.array2d(dtype=float),
+  xpos_in: wp.array2d(dtype=wp.vec3),
+  xquat_in: wp.array2d(dtype=wp.quat),
+  xmat_in: wp.array2d(dtype=wp.mat33),
+  # Static Kernel Args
+  leveladr: int,
+  # Data Outputs
+  xpos_out: wp.array2d(dtype=wp.vec3),
+  xquat_out: wp.array2d(dtype=wp.quat),
+  xmat_out: wp.array2d(dtype=wp.mat33),
+  xipos_out: wp.array2d(dtype=wp.vec3),
+  ximat_out: wp.array2d(dtype=wp.mat33),
+  xanchor_out: wp.array2d(dtype=wp.vec3),
+  xaxis_out: wp.array2d(dtype=wp.vec3),
+):
+  worldid, nodeid = wp.tid()
+  bodyid = body_tree[leveladr + nodeid]
+  jntadr = body_jntadr[bodyid]
+  jntnum = body_jntnum[bodyid]
+  qpos = qpos_in[worldid]
+
+  xpos = wp.vec3(0.0)
+  xquat = wp.quat(1.0, 0.0, 0.0, 0.0)
+
+  if jntnum == 0:
+    # no joints - apply fixed translation and rotation relative to parent
+    pid = body_parentid[bodyid]
+    xpos = (xmat_in[worldid, pid] * body_pos[bodyid]) + xpos_in[worldid, pid]
+    xquat = math.mul_quat(xquat_in[worldid, pid], body_quat[bodyid])
+  elif jntnum == 1 and jnt_type[jntadr] == wp.static(JointType.FREE.value):
+    # free joint
+    qadr = jnt_qposadr[jntadr]
+    xpos = wp.vec3(qpos[qadr], qpos[qadr + 1], qpos[qadr + 2])
+    xquat = wp.quat(qpos[qadr + 3], qpos[qadr + 4], qpos[qadr + 5], qpos[qadr + 6])
+    xanchor_out[worldid, jntadr] = xpos
+    xaxis_out[worldid, jntadr] = jnt_axis[jntadr]
+  else:
+    # regular joints
+    pid = body_parentid[bodyid]
+    xpos = (xmat_in[worldid, pid] * body_pos[bodyid]) + xpos_in[worldid, pid]
+    xquat = math.mul_quat(xquat_in[worldid, pid], body_quat[bodyid])
+
+    for _ in range(jntnum):
+      qadr = jnt_qposadr[jntadr]
+      jnt_type_val = jnt_type[jntadr]
+      jnt_axis_val = jnt_axis[jntadr]
+      xanchor = math.rot_vec_quat(jnt_pos[jntadr], xquat) + xpos
+      xaxis = math.rot_vec_quat(jnt_axis_val, xquat)
+
+      if jnt_type_val == wp.static(JointType.BALL.value):
+        qloc = wp.quat(
+          qpos[qadr + 0],
+          qpos[qadr + 1],
+          qpos[qadr + 2],
+          qpos[qadr + 3],
+        )
+        xquat = math.mul_quat(xquat, qloc)
+        # correct for off-center rotation
+        xpos = xanchor - math.rot_vec_quat(jnt_pos[jntadr], xquat)
+      elif jnt_type_val == wp.static(JointType.SLIDE.value):
+        xpos += xaxis * (qpos[qadr] - qpos0[qadr])
+      elif jnt_type_val == wp.static(JointType.HINGE.value):
+        qpos0_val = qpos0[qadr]
+        qloc = math.axis_angle_to_quat(jnt_axis_val, qpos[qadr] - qpos0_val)
+        xquat = math.mul_quat(xquat, qloc)
+        # correct for off-center rotation
+        xpos = xanchor - math.rot_vec_quat(jnt_pos[jntadr], xquat)
+
+      xanchor_out[worldid, jntadr] = xanchor
+      xaxis_out[worldid, jntadr] = xaxis
+      jntadr += 1
+
+  xpos_out[worldid, bodyid] = xpos
+  xquat = wp.normalize(xquat)
+  xquat_out[worldid, bodyid] = xquat
+  xmat_out[worldid, bodyid] = math.quat_to_mat(xquat)
+  xipos_out[worldid, bodyid] = xpos + math.rot_vec_quat(body_ipos[bodyid], xquat)
+  ximat_out[worldid, bodyid] = math.quat_to_mat(
+    math.mul_quat(xquat, body_iquat[bodyid])
+  )
+
+
+@kernel
+def geom_local_to_global(
+  # Model Inputs
+  geom_bodyid: wp.array(dtype=int),
+  geom_pos: wp.array(dtype=wp.vec3),
+  geom_quat: wp.array(dtype=wp.quat),
+  # Data Inputs
+  xpos: wp.array2d(dtype=wp.vec3),
+  xquat: wp.array2d(dtype=wp.quat),
+  # Output Args
+  geom_xpos_out: wp.array2d(dtype=wp.vec3),
+  geom_xmat_out: wp.array2d(dtype=wp.mat33),
+):
+  worldid, geomid = wp.tid()
+  bodyid = geom_bodyid[geomid]
+  xpos_b = xpos[worldid, bodyid]
+  xquat_b = xquat[worldid, bodyid]
+  geom_xpos_out[worldid, geomid] = xpos_b + math.rot_vec_quat(geom_pos[geomid], xquat_b)
+  geom_xmat_out[worldid, geomid] = math.quat_to_mat(
+    math.mul_quat(xquat_b, geom_quat[geomid])
+  )
+
+@kernel
+def site_local_to_global(
+  # Model Inputs
+  site_bodyid: wp.array(dtype=int),
+  site_pos: wp.array(dtype=wp.vec3),
+  site_quat: wp.array(dtype=wp.quat),
+  # Data Inputs
+  xpos: wp.array2d(dtype=wp.vec3),
+  xquat: wp.array2d(dtype=wp.quat),
+  # Output Args
+  site_xpos_out: wp.array2d(dtype=wp.vec3),
+  site_xmat_out: wp.array2d(dtype=wp.mat33),
+):
+  worldid, siteid = wp.tid()
+  bodyid = site_bodyid[siteid]
+  xpos_b = xpos[worldid, bodyid]
+  xquat_b = xquat[worldid, bodyid]
+  site_xpos_out[worldid, siteid] = xpos_b + math.rot_vec_quat(site_pos[siteid], xquat_b)
+  site_xmat_out[worldid, siteid] = math.quat_to_mat(
+    math.mul_quat(xquat_b, site_quat[siteid])
+  )
+
+
 def kinematics_(
   # Model Inputs
   body_tree: wp.array(dtype=int),
@@ -198,165 +357,6 @@ def kinematics_(
   nbody = body_parentid.shape[0]
   ngeom = geom_bodyid.shape[0]
   nsite = site_bodyid.shape[0]
-
-
-  @kernel
-  def _root(
-    xpos: wp.array2d(dtype=wp.vec3),
-    xquat: wp.array2d(dtype=wp.quat),
-    xmat: wp.array2d(dtype=wp.mat33),
-    xipos: wp.array2d(dtype=wp.vec3),
-    ximat: wp.array2d(dtype=wp.mat33),
-  ):
-    worldid = wp.tid()
-    xpos[worldid, 0] = wp.vec3(0.0)
-    xquat[worldid, 0] = wp.quat(1.0, 0.0, 0.0, 0.0)
-    xipos[worldid, 0] = wp.vec3(0.0)
-    xmat[worldid, 0] = wp.identity(n=3, dtype=wp.float32)
-    ximat[worldid, 0] = wp.identity(n=3, dtype=wp.float32)
-
-  @kernel
-  def _level(
-    # Model Inputs
-    body_tree: wp.array(dtype=int),
-    qpos0: wp.array(dtype=float),
-    body_parentid: wp.array(dtype=int),
-    body_jntadr: wp.array(dtype=int),
-    body_jntnum: wp.array(dtype=int),
-    body_pos: wp.array(dtype=wp.vec3),
-    body_quat: wp.array(dtype=wp.quat),
-    body_ipos: wp.array(dtype=wp.vec3),
-    body_iquat: wp.array(dtype=wp.quat),
-    jnt_type: wp.array(dtype=int),
-    jnt_qposadr: wp.array(dtype=int),
-    jnt_pos: wp.array(dtype=wp.vec3),
-    jnt_axis: wp.array(dtype=wp.vec3),
-    # Data Inputs
-    qpos_in: wp.array2d(dtype=float),
-    xpos_in: wp.array2d(dtype=wp.vec3),
-    xquat_in: wp.array2d(dtype=wp.quat),
-    xmat_in: wp.array2d(dtype=wp.mat33),
-    # Static Kernel Args
-    leveladr: int,
-    # Data Outputs
-    xpos_out: wp.array2d(dtype=wp.vec3),
-    xquat_out: wp.array2d(dtype=wp.quat),
-    xmat_out: wp.array2d(dtype=wp.mat33),
-    xipos_out: wp.array2d(dtype=wp.vec3),
-    ximat_out: wp.array2d(dtype=wp.mat33),
-    xanchor_out: wp.array2d(dtype=wp.vec3),
-    xaxis_out: wp.array2d(dtype=wp.vec3),
-  ):
-    worldid, nodeid = wp.tid()
-    bodyid = body_tree[leveladr + nodeid]
-    jntadr = body_jntadr[bodyid]
-    jntnum = body_jntnum[bodyid]
-    qpos = qpos_in[worldid]
-
-    xpos = wp.vec3(0.0)
-    xquat = wp.quat(1.0, 0.0, 0.0, 0.0)
-
-    if jntnum == 0:
-      # no joints - apply fixed translation and rotation relative to parent
-      pid = body_parentid[bodyid]
-      xpos = (xmat_in[worldid, pid] * body_pos[bodyid]) + xpos_in[worldid, pid]
-      xquat = math.mul_quat(xquat_in[worldid, pid], body_quat[bodyid])
-    elif jntnum == 1 and jnt_type[jntadr] == wp.static(JointType.FREE.value):
-      # free joint
-      qadr = jnt_qposadr[jntadr]
-      xpos = wp.vec3(qpos[qadr], qpos[qadr + 1], qpos[qadr + 2])
-      xquat = wp.quat(qpos[qadr + 3], qpos[qadr + 4], qpos[qadr + 5], qpos[qadr + 6])
-      xanchor_out[worldid, jntadr] = xpos
-      xaxis_out[worldid, jntadr] = jnt_axis[jntadr]
-    else:
-      # regular joints
-      pid = body_parentid[bodyid]
-      xpos = (xmat_in[worldid, pid] * body_pos[bodyid]) + xpos_in[worldid, pid]
-      xquat = math.mul_quat(xquat_in[worldid, pid], body_quat[bodyid])
-
-      for _ in range(jntnum):
-        qadr = jnt_qposadr[jntadr]
-        jnt_type_val = jnt_type[jntadr]
-        jnt_axis_val = jnt_axis[jntadr]
-        xanchor = math.rot_vec_quat(jnt_pos[jntadr], xquat) + xpos
-        xaxis = math.rot_vec_quat(jnt_axis_val, xquat)
-
-        if jnt_type_val == wp.static(JointType.BALL.value):
-          qloc = wp.quat(
-            qpos[qadr + 0],
-            qpos[qadr + 1],
-            qpos[qadr + 2],
-            qpos[qadr + 3],
-          )
-          xquat = math.mul_quat(xquat, qloc)
-          # correct for off-center rotation
-          xpos = xanchor - math.rot_vec_quat(jnt_pos[jntadr], xquat)
-        elif jnt_type_val == wp.static(JointType.SLIDE.value):
-          xpos += xaxis * (qpos[qadr] - qpos0[qadr])
-        elif jnt_type_val == wp.static(JointType.HINGE.value):
-          qpos0_val = qpos0[qadr]
-          qloc = math.axis_angle_to_quat(jnt_axis_val, qpos[qadr] - qpos0_val)
-          xquat = math.mul_quat(xquat, qloc)
-          # correct for off-center rotation
-          xpos = xanchor - math.rot_vec_quat(jnt_pos[jntadr], xquat)
-
-        xanchor_out[worldid, jntadr] = xanchor
-        xaxis_out[worldid, jntadr] = xaxis
-        jntadr += 1
-
-    xpos_out[worldid, bodyid] = xpos
-    xquat = wp.normalize(xquat)
-    xquat_out[worldid, bodyid] = xquat
-    xmat_out[worldid, bodyid] = math.quat_to_mat(xquat)
-    xipos_out[worldid, bodyid] = xpos + math.rot_vec_quat(body_ipos[bodyid], xquat)
-    ximat_out[worldid, bodyid] = math.quat_to_mat(
-      math.mul_quat(xquat, body_iquat[bodyid])
-    )
-
-
-  @kernel
-  def geom_local_to_global(
-    # Model Inputs
-    geom_bodyid: wp.array(dtype=int),
-    geom_pos: wp.array(dtype=wp.vec3),
-    geom_quat: wp.array(dtype=wp.quat),
-    # Data Inputs
-    xpos: wp.array2d(dtype=wp.vec3),
-    xquat: wp.array2d(dtype=wp.quat),
-    # Output Args
-    geom_xpos_out: wp.array2d(dtype=wp.vec3),
-    geom_xmat_out: wp.array2d(dtype=wp.mat33),
-  ):
-    worldid, geomid = wp.tid()
-    bodyid = geom_bodyid[geomid]
-    xpos_b = xpos[worldid, bodyid]
-    xquat_b = xquat[worldid, bodyid]
-    geom_xpos_out[worldid, geomid] = xpos_b + math.rot_vec_quat(geom_pos[geomid], xquat_b)
-    geom_xmat_out[worldid, geomid] = math.quat_to_mat(
-      math.mul_quat(xquat_b, geom_quat[geomid])
-    )
-
-  @kernel
-  def site_local_to_global(
-    # Model Inputs
-    site_bodyid: wp.array(dtype=int),
-    site_pos: wp.array(dtype=wp.vec3),
-    site_quat: wp.array(dtype=wp.quat),
-    # Data Inputs
-    xpos: wp.array2d(dtype=wp.vec3),
-    xquat: wp.array2d(dtype=wp.quat),
-    # Output Args
-    site_xpos_out: wp.array2d(dtype=wp.vec3),
-    site_xmat_out: wp.array2d(dtype=wp.mat33),
-  ):
-    worldid, siteid = wp.tid()
-    bodyid = site_bodyid[siteid]
-    xpos_b = xpos[worldid, bodyid]
-    xquat_b = xquat[worldid, bodyid]
-    site_xpos_out[worldid, siteid] = xpos_b + math.rot_vec_quat(site_pos[siteid], xquat_b)
-    site_xmat_out[worldid, siteid] = math.quat_to_mat(
-      math.mul_quat(xquat_b, site_quat[siteid])
-    )
 
   # Launch kernels with explicit arguments
   wp.launch(_root, dim=(nworld), inputs=[], outputs=[xpos, xquat, xmat, xipos, ximat])

@@ -156,6 +156,7 @@ class ImplicitIntegratorTest(parameterized.TestCase):
     mjwarp.DisableBit.PASSIVE.value & mjwarp.DisableBit.ACTUATION.value,
   )
   def test_implicit(self, disableFlags):
+    np.random.seed(0)
     mjm, _, _, _ = test_util.fixture("pendula.xml")
 
     mjm.opt.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
