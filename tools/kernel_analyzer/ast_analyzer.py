@@ -4,7 +4,16 @@ from typing import Any, Dict, List, Set
 import mujoco_warp as mjwarp
 import warp as wp
 
-_EXPECTED_TYPES = ("int", "float", "bool", "array", "array2d", "array2df", "array3d", "array3df")
+_EXPECTED_TYPES = (
+  "int",
+  "float",
+  "bool",
+  "array",
+  "array2d",
+  "array2df",
+  "array3d",
+  "array3df",
+)
 
 
 class DefaultsParamsIssue:
@@ -128,12 +137,12 @@ class WriteToReadOnlyFieldIssue:
 
   def __str__(self):
     return f"{self.lineno}: Kernel '{self.kernel}' writes to {self.field_type} field '{self.field_name}' which should be read-only"
-    
+
   def __eq__(self, other):
     if not isinstance(other, WriteToReadOnlyFieldIssue):
       return False
     return str(self) == str(other)
-    
+
   def __hash__(self):
     return hash(str(self))
 
@@ -364,45 +373,45 @@ def _check_parameter_comments(
   model_fields = _get_valid_model_fields()
   data_fields = _get_valid_data_fields()
   raw_data_fields = mjwarp.Data.__annotations__.keys()
-  
+
   # Get the function body start line
   func_line = node.lineno
   func_body_start = func_line
-  
+
   # Find where the actual parameters start in the source code
-  for i, line in enumerate(source_lines[func_line-1:], func_line-1):
-    if '(' in line:
+  for i, line in enumerate(source_lines[func_line - 1 :], func_line - 1):
+    if "(" in line:
       func_body_start = i
       break
-  
+
   # Track the first occurrence of each parameter category
   first_model = None
   first_regular_data = None
   first_data_in = None
   first_data_out = None
-  
+
   # Find parameter positions in source code
   for param in node.args.args:
     param_name = param.arg
     param_type = None
-    
+
     if param.annotation:
       if isinstance(param.annotation, ast.Call):
         param_type = param.annotation.func.attr
       else:
         param_type = param.annotation.id
-    
+
     # Find the line number where this parameter appears
     param_line = None
     for i, line in enumerate(source_lines[func_body_start:], func_body_start):
       if param_name + ":" in line:
         param_line = i
         break
-    
+
     # If we couldn't find the parameter, skip it
     if param_line is None:
       continue
-      
+
     # Only record the first occurrence of each category
     if param_name in model_fields and first_model is None:
       first_model = (param_name, param_type, param_line, "# Model")
@@ -416,23 +425,18 @@ def _check_parameter_comments(
       first_data_in = (param_name, param_type, param_line, "# Data in")
     elif param_name.endswith("_out") and first_data_out is None:
       first_data_out = (param_name, param_type, param_line, "# Data out")
-  
+
   # Check for comments on the lines before the first parameter of each category
-  categories = [
-    first_model, 
-    first_regular_data,
-    first_data_in, 
-    first_data_out
-  ]
-  
+  categories = [first_model, first_regular_data, first_data_in, first_data_out]
+
   # Sort by line number to preserve order
   categories = [c for c in categories if c is not None]
   categories.sort(key=lambda x: x[2])
-  
+
   # Check each category
   for param_info in categories:
     param_name, param_type, param_line, expected_comment = param_info
-    
+
     # Check if the line before has the expected comment
     if param_line > 0 and param_line < len(source_lines):
       prev_line = source_lines[param_line - 1].strip()
@@ -448,11 +452,13 @@ def _check_parameter_comments(
         )
 
 
-def _check_no_writes_to_readonly_fields(node: ast.FunctionDef, issues: List[WriteToReadOnlyFieldIssue]):
+def _check_no_writes_to_readonly_fields(
+  node: ast.FunctionDef, issues: List[WriteToReadOnlyFieldIssue]
+):
   """Check that the function doesn't write to Model params or Data fields with _in suffix."""
   model_fields = _get_valid_model_fields()
   data_fields = _get_valid_data_fields()
-  
+
   # Track parameters that shouldn't be written to
   readonly_params = {}
   for param in node.args.args:
@@ -468,13 +474,19 @@ def _check_no_writes_to_readonly_fields(node: ast.FunctionDef, issues: List[Writ
     # Check for simple assignments
     if isinstance(body_item, ast.Assign):
       for target in body_item.targets:
-        _check_target_for_readonly_writes(target, readonly_params, node.name, new_issues)
+        _check_target_for_readonly_writes(
+          target, readonly_params, node.name, new_issues
+        )
     # Check for augmented assignments (+=, -=, etc.)
     elif isinstance(body_item, ast.AugAssign):
-      _check_target_for_readonly_writes(body_item.target, readonly_params, node.name, new_issues)
+      _check_target_for_readonly_writes(
+        body_item.target, readonly_params, node.name, new_issues
+      )
     # Also check for in-place operations like a[i] = value
     elif isinstance(body_item, ast.Subscript) and isinstance(body_item.ctx, ast.Store):
-      _check_target_for_readonly_writes(body_item.value, readonly_params, node.name, new_issues)
+      _check_target_for_readonly_writes(
+        body_item.value, readonly_params, node.name, new_issues
+      )
 
   issues.extend(new_issues)
 
@@ -482,7 +494,7 @@ def _check_no_writes_to_readonly_fields(node: ast.FunctionDef, issues: List[Writ
 def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issues):
   """Check if an assignment target is writing to a read-only parameter."""
   target_name = None
-  
+
   # Simple variable name
   if isinstance(target, ast.Name):
     target_name = target.id
@@ -500,10 +512,10 @@ def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issu
   if target_name and target_name in readonly_params:
     issues.add(
       WriteToReadOnlyFieldIssue(
-        lineno=target.lineno if hasattr(target, 'lineno') else 0,
+        lineno=target.lineno if hasattr(target, "lineno") else 0,
         kernel=kernel_name,
         field_name=target_name,
-        field_type=readonly_params[target_name]
+        field_type=readonly_params[target_name],
       )
     )
 
@@ -538,7 +550,7 @@ def analyze(code_string: str, filename: str):
 
       # Check parameter type annotations.
       _check_parameter_types(node, issues)
-      
+
       # TODO(btaba): Check field type annotations match original class.
       # _check_field_type_annotations(node, issues, source_lines)
 
@@ -550,7 +562,7 @@ def analyze(code_string: str, filename: str):
 
       # Check parameter comments
       _check_parameter_comments(node, issues, source_lines)
-      
+
       # Check no writes to read-only fields
       _check_no_writes_to_readonly_fields(node, issues)
 

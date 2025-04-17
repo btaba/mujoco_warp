@@ -29,7 +29,14 @@ def test_function(m: Model, d: Data):
 
 
 @kernel
-def _root(m: Model, d: Data, qpos0: wp.array(dtype=wp.float32, ndim=1), hi: int = 1,  *args, **kwargs):
+def _root(
+  m: Model,
+  d: Data,
+  qpos0: wp.array(dtype=wp.float32, ndim=1),
+  hi: int = 1,
+  *args,
+  **kwargs,
+):
   worldid = wp.tid()
   d.xpos[worldid, 0] = wp.vec3(0.0)
 
@@ -59,6 +66,7 @@ def test_model_data_in_the_middle(
   worldid = wp.tid()
   qvel_in[worldid] = xpos_out[worldid]
   qpos0[worldid] = qpos0_out[worldid]
+
 
 @kernel
 def test_comments(
