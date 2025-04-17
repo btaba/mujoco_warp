@@ -201,6 +201,10 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     )
   )[0]
 
+  jnt_limited_ball_adr = np.nonzero(
+    mjm.jnt_limited & (mjm.jnt_type == mujoco.mjtJoint.mjJNT_BALL)
+  )[0]
+
   # body_tree is BFS ordering of body ids
   # body_treeadr contains starting index of each body tree level
   bodies, body_depth = {}, np.zeros(mjm.nbody, dtype=int) - 1
@@ -384,6 +388,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   m.jnt_limited_slide_hinge_adr = wp.array(
     jnt_limited_slide_hinge_adr, dtype=wp.int32, ndim=1
   )
+  m.jnt_limited_ball_adr = wp.array(jnt_limited_ball_adr, dtype=wp.int32, ndim=1)
   m.jnt_type = wp.array(mjm.jnt_type, dtype=wp.int32, ndim=1)
   m.jnt_solref = wp.array(mjm.jnt_solref, dtype=wp.vec2f, ndim=1)
   m.jnt_solimp = wp.array(mjm.jnt_solimp, dtype=types.vec5, ndim=1)
@@ -461,13 +466,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   m.actuator_forcelimited = wp.array(mjm.actuator_forcelimited, dtype=wp.bool, ndim=1)
   m.actuator_forcerange = wp.array(mjm.actuator_forcerange, dtype=wp.vec2, ndim=1)
   m.actuator_gaintype = wp.array(mjm.actuator_gaintype, dtype=wp.int32, ndim=1)
-  m.actuator_gainprm = wp.array(mjm.actuator_gainprm, dtype=wp.float32, ndim=2)
+  m.actuator_gainprm = wp.array(mjm.actuator_gainprm, dtype=types.vec10f, ndim=1)
   m.actuator_biastype = wp.array(mjm.actuator_biastype, dtype=wp.int32, ndim=1)
-  m.actuator_biasprm = wp.array(mjm.actuator_biasprm, dtype=wp.float32, ndim=2)
+  m.actuator_biasprm = wp.array(mjm.actuator_biasprm, dtype=types.vec10f, ndim=1)
   m.actuator_gear = wp.array(mjm.actuator_gear, dtype=wp.spatial_vector, ndim=1)
   m.actuator_actlimited = wp.array(mjm.actuator_actlimited, dtype=wp.bool, ndim=1)
   m.actuator_actrange = wp.array(mjm.actuator_actrange, dtype=wp.vec2, ndim=1)
   m.actuator_actadr = wp.array(mjm.actuator_actadr, dtype=wp.int32, ndim=1)
+  m.actuator_actnum = wp.array(mjm.actuator_actnum, dtype=wp.int32, ndim=1)
   m.actuator_dyntype = wp.array(mjm.actuator_dyntype, dtype=wp.int32, ndim=1)
   m.actuator_dynprm = wp.array(mjm.actuator_dynprm, dtype=types.vec10f, ndim=1)
   m.exclude_signature = wp.array(mjm.exclude_signature, dtype=wp.int32, ndim=1)
