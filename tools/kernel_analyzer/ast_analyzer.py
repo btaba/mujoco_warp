@@ -2,8 +2,9 @@ import ast
 import logging
 from typing import Any, Dict, List, Set
 import mujoco_warp as mjwarp
+import warp as wp
 
-_EXPECTED_TYPES = ("array", "array2d", "array2df", "array3d", "array3df")
+_EXPECTED_TYPES = ("int", "float", "bool", "array", "array2d", "array2df", "array3d", "array3df")
 
 
 class DefaultsParamsIssue:
@@ -118,12 +119,31 @@ class MissingCommentIssue:
     return f"{self.lineno}: Kernel '{self.kernel}' parameter '{self.param_name}' of type '{self.param_type}' missing '{self.expected_comment}' comment"
 
 
-def get_valid_model_fields() -> Dict[str, Any]:
+class WriteToReadOnlyFieldIssue:
+  def __init__(self, lineno: int, kernel: str, field_name: str, field_type: str):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.field_name = field_name
+    self.field_type = field_type
+
+  def __str__(self):
+    return f"{self.lineno}: Kernel '{self.kernel}' writes to {self.field_type} field '{self.field_name}' which should be read-only"
+    
+  def __eq__(self, other):
+    if not isinstance(other, WriteToReadOnlyFieldIssue):
+      return False
+    return str(self) == str(other)
+    
+  def __hash__(self):
+    return hash(str(self))
+
+
+def _get_valid_model_fields() -> Dict[str, Any]:
   """Return valid model fields."""
   return mjwarp.Model.__annotations__
 
 
-def get_valid_data_fields() -> Dict[str, Any]:
+def _get_valid_data_fields() -> Dict[str, Any]:
   """Return valid data fields."""
   fields = mjwarp.Data.__annotations__
   fields_in = {k + "_in": v for k, v in fields.items()}
@@ -132,6 +152,7 @@ def get_valid_data_fields() -> Dict[str, Any]:
 
 
 def _check_parameter_types(node: ast.FunctionDef, issues: List[TypeIssue]):
+  """Check that parameter types are present and in a permissible set."""
   for param in node.args.args:
     if param.annotation is None:
       issues.append(
@@ -150,8 +171,8 @@ def _check_parameter_types(node: ast.FunctionDef, issues: List[TypeIssue]):
 def _check_model_data_in_the_middle(
   node: ast.FunctionDef, issues: List[ArgPositionIssue]
 ):
-  model_fields = get_valid_model_fields()
-  data_fields = get_valid_data_fields()
+  model_fields = _get_valid_model_fields()
+  data_fields = _get_valid_data_fields()
 
   # Check that Model/Data fields are in the middle, other parameters at beginning or end.
   model_indices, data_indices, other_indices = [], [], []
@@ -190,8 +211,8 @@ def _check_model_fields_before_data_fields(
   node: ast.FunctionDef, issues: List[ArgPositionIssue]
 ):
   # Check that Model fields come before Data fields.
-  data_fields = get_valid_data_fields()
-  model_fields = get_valid_model_fields()
+  data_fields = _get_valid_data_fields()
+  model_fields = _get_valid_model_fields()
 
   model_indices, data_indices = [], []
   for i, param in enumerate(node.args.args):
@@ -215,8 +236,8 @@ def _check_model_fields_before_data_fields(
 
 def _check_data_fields_order(node: ast.FunctionDef, issues: List[ArgPositionIssue]):
   # Check that regular Data fields come before Data _in fields, which come before Data _out fields.
-  data_fields = get_valid_data_fields()
-  model_fields = get_valid_model_fields()
+  data_fields = _get_valid_data_fields()
+  model_fields = _get_valid_model_fields()
 
   data_regular_indices, data_in_indices, data_out_indices = [], [], []
   for i, param in enumerate(node.args.args):
@@ -277,7 +298,7 @@ def _check_model_field_suffixes(
   node: ast.FunctionDef, issues: List[ModelFieldSuffixIssue]
 ):
   """Check that Model fields don't end with _in or _out suffixes."""
-  model_fields = get_valid_model_fields()
+  model_fields = _get_valid_model_fields()
 
   for param in node.args.args:
     param_name = param.arg
@@ -299,7 +320,7 @@ def _check_data_field_suffixes(
   node: ast.FunctionDef, issues: List[DataFieldSuffixIssue]
 ):
   """Check that Data fields either use the original name or end with _in or _out."""
-  data_fields = get_valid_data_fields()
+  data_fields = _get_valid_data_fields()
   raw_data_fields = mjwarp.Data.__annotations__.keys()
 
   for param in node.args.args:
@@ -340,8 +361,8 @@ def _check_parameter_comments(
   node: ast.FunctionDef, issues: List[MissingCommentIssue], source_lines: List[str]
 ):
   """Check for comments on the line before the first occurrence of any Model/Data field type."""
-  model_fields = get_valid_model_fields()
-  data_fields = get_valid_data_fields()
+  model_fields = _get_valid_model_fields()
+  data_fields = _get_valid_data_fields()
   raw_data_fields = mjwarp.Data.__annotations__.keys()
   
   # Get the function body start line
@@ -427,7 +448,67 @@ def _check_parameter_comments(
         )
 
 
-def analyze(code_string: str, filename: str = "<string>"):
+def _check_no_writes_to_readonly_fields(node: ast.FunctionDef, issues: List[WriteToReadOnlyFieldIssue]):
+  """Check that the function doesn't write to Model params or Data fields with _in suffix."""
+  model_fields = _get_valid_model_fields()
+  data_fields = _get_valid_data_fields()
+  
+  # Track parameters that shouldn't be written to
+  readonly_params = {}
+  for param in node.args.args:
+    param_name = param.arg
+    if param_name in model_fields:
+      readonly_params[param_name] = "Model"
+    elif param_name.endswith("_in") and param_name[:-3] in mjwarp.Data.__annotations__:
+      readonly_params[param_name] = "Data input"
+
+  new_issues = set()
+  # Visit all assignments in the function body
+  for body_item in ast.walk(node):
+    # Check for simple assignments
+    if isinstance(body_item, ast.Assign):
+      for target in body_item.targets:
+        _check_target_for_readonly_writes(target, readonly_params, node.name, new_issues)
+    # Check for augmented assignments (+=, -=, etc.)
+    elif isinstance(body_item, ast.AugAssign):
+      _check_target_for_readonly_writes(body_item.target, readonly_params, node.name, new_issues)
+    # Also check for in-place operations like a[i] = value
+    elif isinstance(body_item, ast.Subscript) and isinstance(body_item.ctx, ast.Store):
+      _check_target_for_readonly_writes(body_item.value, readonly_params, node.name, new_issues)
+
+  issues.extend(new_issues)
+
+
+def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issues):
+  """Check if an assignment target is writing to a read-only parameter."""
+  target_name = None
+  
+  # Simple variable name
+  if isinstance(target, ast.Name):
+    target_name = target.id
+  # Attribute access like obj.attr
+  elif isinstance(target, ast.Attribute):
+    # For attribute access, we check the base object
+    if isinstance(target.value, ast.Name):
+      target_name = target.value.id
+  # Subscript access like obj[index]
+  elif isinstance(target, ast.Subscript):
+    if isinstance(target.value, ast.Name):
+      target_name = target.value.id
+
+  # If we have a target name and it's in our read-only list
+  if target_name and target_name in readonly_params:
+    issues.add(
+      WriteToReadOnlyFieldIssue(
+        lineno=target.lineno if hasattr(target, 'lineno') else 0,
+        kernel=kernel_name,
+        field_name=target_name,
+        field_type=readonly_params[target_name]
+      )
+    )
+
+
+def analyze(code_string: str, filename: str):
   """Parses Python code and finds functions with unsorted simple parameters."""
   issues = []
   logging.info(f"Analyzing {filename}...")
@@ -456,19 +537,22 @@ def analyze(code_string: str, filename: str = "<string>"):
         issues.append(KwArgsIssue(kernel=node.name, lineno=node.lineno))
 
       # Check parameter type annotations.
-      # TODO(btaba): check the types match Model/Data types.
       _check_parameter_types(node, issues)
+      
+      # TODO(btaba): Check field type annotations match original class.
+      # _check_field_type_annotations(node, issues, source_lines)
 
       # Check argument naming.
       _check_argument_naming(node, issues)
 
       # Check argument positions.
       _check_argument_positions(node, issues)
-      
+
       # Check parameter comments
       _check_parameter_comments(node, issues, source_lines)
-
-      # TODO(btaba): check that you never write to Model param or an _in field
+      
+      # Check no writes to read-only fields
+      _check_no_writes_to_readonly_fields(node, issues)
 
   except SyntaxError as e:
     logging.error(f"Syntax error in {filename}:{e.lineno}: {e.msg}")
