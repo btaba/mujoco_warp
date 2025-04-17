@@ -369,7 +369,7 @@ def _check_argument_positions(node: ast.FunctionDef, issues: List):
 def _check_parameter_comments(
   node: ast.FunctionDef, issues: List[MissingCommentIssue], source_lines: List[str]
 ):
-  """Check for comments on the line before the first occurrence of any Model/Data field type."""
+  """Check for comments on the line before the first occurrence of the first Model/Data field."""
   model_fields = _get_valid_model_fields()
   data_fields = _get_valid_data_fields()
   raw_data_fields = mjwarp.Data.__annotations__.keys()
@@ -415,11 +415,9 @@ def _check_parameter_comments(
     # Only record the first occurrence of each category
     if param_name in model_fields and first_model is None:
       first_model = (param_name, param_type, param_line, "# Model")
-      continue
-    if param_name not in data_fields:
-      continue
-
-    if param_name in raw_data_fields and first_regular_data is None:
+    elif param_name not in data_fields:
+      continue  # Skip if it's not a Model or Data field
+    elif param_name in raw_data_fields and first_regular_data is None:
       first_regular_data = (param_name, param_type, param_line, "# Data")
     elif param_name.endswith("_in") and first_data_in is None:
       first_data_in = (param_name, param_type, param_line, "# Data in")
@@ -436,20 +434,20 @@ def _check_parameter_comments(
   # Check each category
   for param_info in categories:
     param_name, param_type, param_line, expected_comment = param_info
-
+    if param_line < 0 or param_line >= len(source_lines):
+      continue
     # Check if the line before has the expected comment
-    if param_line > 0 and param_line < len(source_lines):
-      prev_line = source_lines[param_line - 1].strip()
-      if expected_comment not in prev_line:
-        issues.append(
-          MissingCommentIssue(
-            lineno=param_line,
-            kernel=node.name,
-            param_name=param_name,
-            param_type=param_type,
-            expected_comment=expected_comment,
-          )
+    prev_line = source_lines[param_line - 1].strip()
+    if expected_comment not in prev_line:
+      issues.append(
+        MissingCommentIssue(
+          lineno=param_line,
+          kernel=node.name,
+          param_name=param_name,
+          param_type=param_type,
+          expected_comment=expected_comment,
         )
+      )
 
 
 def _check_no_writes_to_readonly_fields(
