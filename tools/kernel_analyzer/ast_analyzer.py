@@ -1,9 +1,11 @@
 import ast
-import logging
 import inspect
-from typing import Any, Dict, List, Set
-import mujoco_warp as mjwarp
+import logging
+from typing import Any, Dict, List
+
 import warp as wp
+
+import mujoco_warp as mjwarp
 
 _EXPECTED_TYPES = (
   "int",
@@ -23,7 +25,7 @@ class DefaultsParamsIssue:
     self.kernel = kernel
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' has default params"
+    return f"Kernel '{self.kernel}' has default params"
 
 
 class VarArgsIssue:
@@ -32,7 +34,7 @@ class VarArgsIssue:
     self.lineno = lineno
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' has varargs"
+    return f"Kernel '{self.kernel}' has varargs"
 
 
 class KwArgsIssue:
@@ -41,7 +43,7 @@ class KwArgsIssue:
     self.lineno = lineno
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' has kwargs"
+    return f"Kernel '{self.kernel}' has kwargs"
 
 
 class TypeIssue:
@@ -62,7 +64,7 @@ class TypeIssue:
     self.expected_types = expected_types
 
   def __str__(self):
-    str = f"{self.lineno}: Kernel '{self.kernel}' param: {self.param_name} "
+    str = f"Kernel '{self.kernel}' param: {self.param_name} "
     if self.param_type:
       str += f"has type '{self.param_type}', expected one of: {self.expected_types}"
     else:
@@ -90,7 +92,7 @@ class TypeMismatchIssue:
     self.field_source = field_source
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' parameter '{self.param_name}' has type '{self.actual_type}' but {self.field_source} field type is '{self.expected_type}'"
+    return f"Kernel '{self.kernel}' parameter '{self.param_name}' has type '{self.actual_type}' but {self.field_source} field type is '{self.expected_type}'"
 
 
 class ArgPositionIssue:
@@ -101,7 +103,7 @@ class ArgPositionIssue:
     self.details = details
 
   def __str__(self):
-    base_msg = f"{self.lineno}: Kernel '{self.kernel}' has argument position issue: {self.issue_type}"
+    base_msg = f"Kernel '{self.kernel}' has argument position issue: {self.issue_type}"
     if self.details:
       base_msg += f". {self.details}"
     return base_msg
@@ -115,7 +117,7 @@ class ModelFieldSuffixIssue:
     self.suffix = suffix
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' has Model parameter '{self.param_name}' with '{self.suffix}' suffix. Model parameters should not have _in or _out suffixes."
+    return f"Kernel '{self.kernel}' has Model parameter '{self.param_name}' with '{self.suffix}' suffix. Model parameters should not have _in or _out suffixes."
 
 
 class DataFieldSuffixIssue:
@@ -132,7 +134,7 @@ class DataFieldSuffixIssue:
     self.message = message
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' has Data parameter '{self.param_name}' issue: {self.message}"
+    return f"Kernel '{self.kernel}' has Data parameter '{self.param_name}' issue: {self.message}"
 
 
 class MissingCommentIssue:
@@ -151,7 +153,7 @@ class MissingCommentIssue:
     self.expected_comment = expected_comment
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' parameter '{self.param_name}' of type '{self.param_type}' missing '{self.expected_comment}' comment"
+    return f"Kernel '{self.kernel}' parameter '{self.param_name}' of type '{self.param_type}' missing '{self.expected_comment}' comment"
 
 
 class WriteToReadOnlyFieldIssue:
@@ -162,7 +164,7 @@ class WriteToReadOnlyFieldIssue:
     self.field_type = field_type
 
   def __str__(self):
-    return f"{self.lineno}: Kernel '{self.kernel}' writes to {self.field_type} field '{self.field_name}' which should be read-only"
+    return f"Kernel '{self.kernel}' writes to {self.field_type} field '{self.field_name}' which should be read-only"
 
   def __eq__(self, other):
     if not isinstance(other, WriteToReadOnlyFieldIssue):
@@ -669,11 +671,13 @@ def analyze(code_string: str, filename: str):
     tree = ast.parse(code_string, filename=filename)
     source_lines = code_string.splitlines()
 
+    decorator_name = lambda d: d.func.id if isinstance(d, ast.Call) else d.id
+
     for node in ast.walk(tree):
       # Only review kernel functions.
       if not isinstance(node, ast.FunctionDef):
         continue
-      if not any(d.id == "kernel" for d in node.decorator_list):
+      if not any(decorator_name(d) == "kernel" for d in node.decorator_list):
         continue
 
       # Defaults or kw defaults not allowed.

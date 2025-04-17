@@ -1,15 +1,16 @@
-from absl import app
-from absl import flags
-from absl import logging
 import sys
 from pathlib import Path
 
 import ast_analyzer
+from absl import app
+from absl import flags
+from absl import logging
 
 FLAGS = flags.FLAGS
 
 _VERBOSE = flags.DEFINE_bool("verbose", False, "Enable debug logging.")
 _FILES = flags.DEFINE_multi_string("files", [], "Python files to check.")
+_OUTPUT = flags.DEFINE_enum("output", "console", ["console", "github"], "Analyzer output format.")
 
 
 def main(argv):
@@ -26,8 +27,13 @@ def main(argv):
   for filename in _FILES.value:
     filepath = Path(filename)
 
-    def err(iss):
-      print(f"{filepath}:" + str(iss), file=sys.stderr)
+    def err_console(iss):
+      print(f"{filepath}:{iss.lineno}:{iss}", file=sys.stderr)
+    
+    def err_github(iss):
+      print(f"::error title=Kernel Analyzer,file={filepath},line={iss.lineno + 1}::{iss}")
+
+    err = {"console": err_console, "github": err_github}[_OUTPUT.value]
 
     if not filepath.is_file() or filepath.suffix != ".py":
       err("Skipping non-Python file")
