@@ -55,3 +55,18 @@ def test_model_data_in_the_middle(
   qpos: wp.array(float, ndim=1),
 ):
   worldid = wp.tid()
+
+
+
+@kernel
+def test_comments(
+  # Model
+  qpos0: wp.array(float, ndim=1),
+  # Data
+  qvel: wp.array(float, ndim=1),
+  # Data in
+  qvel_in: wp.array(float, ndim=1),
+  # Data out
+  xpos_out: wp.array(float, ndim=1),
+):
+  worldid = wp.tid()

@@ -99,6 +99,25 @@ class DataFieldSuffixIssue:
     return f"{self.lineno}: Kernel '{self.kernel}' has Data parameter '{self.param_name}' issue: {self.message}"
 
 
+class MissingCommentIssue:
+  def __init__(
+    self,
+    lineno: int,
+    kernel: str,
+    param_name: str,
+    param_type: str,
+    expected_comment: str,
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.param_name = param_name
+    self.param_type = param_type
+    self.expected_comment = expected_comment
+
+  def __str__(self):
+    return f"{self.lineno}: Kernel '{self.kernel}' parameter '{self.param_name}' of type '{self.param_type}' missing '{self.expected_comment}' comment"
+
+
 def get_valid_model_fields() -> Dict[str, Any]:
   """Return valid model fields."""
   return mjwarp.Model.__annotations__
@@ -306,12 +325,106 @@ def _check_data_field_suffixes(
         )
 
 
+def _check_argument_naming(node: ast.FunctionDef, issues: List[ArgPositionIssue]):
+  _check_model_field_suffixes(node, issues)
+  _check_data_field_suffixes(node, issues)
+
+
 def _check_argument_positions(node: ast.FunctionDef, issues: List):
   _check_model_data_in_the_middle(node, issues)
   _check_model_fields_before_data_fields(node, issues)
   _check_data_fields_order(node, issues)
-  _check_model_field_suffixes(node, issues)
-  _check_data_field_suffixes(node, issues)
+
+
+def _check_parameter_comments(
+  node: ast.FunctionDef, issues: List[MissingCommentIssue], source_lines: List[str]
+):
+  """Check for comments on the line before the first occurrence of any Model/Data field type."""
+  model_fields = get_valid_model_fields()
+  data_fields = get_valid_data_fields()
+  raw_data_fields = mjwarp.Data.__annotations__.keys()
+  
+  # Get the function body start line
+  func_line = node.lineno
+  func_body_start = func_line
+  
+  # Find where the actual parameters start in the source code
+  for i, line in enumerate(source_lines[func_line-1:], func_line-1):
+    if '(' in line:
+      func_body_start = i
+      break
+  
+  # Track the first occurrence of each parameter category
+  first_model = None
+  first_regular_data = None
+  first_data_in = None
+  first_data_out = None
+  
+  # Find parameter positions in source code
+  for param in node.args.args:
+    param_name = param.arg
+    param_type = None
+    
+    if param.annotation:
+      if isinstance(param.annotation, ast.Call):
+        param_type = param.annotation.func.attr
+      else:
+        param_type = param.annotation.id
+    
+    # Find the line number where this parameter appears
+    param_line = None
+    for i, line in enumerate(source_lines[func_body_start:], func_body_start):
+      if param_name + ":" in line:
+        param_line = i
+        break
+    
+    # If we couldn't find the parameter, skip it
+    if param_line is None:
+      continue
+      
+    # Only record the first occurrence of each category
+    if param_name in model_fields and first_model is None:
+      first_model = (param_name, param_type, param_line, "# Model")
+      continue
+    if param_name not in data_fields:
+      continue
+
+    if param_name in raw_data_fields and first_regular_data is None:
+      first_regular_data = (param_name, param_type, param_line, "# Data")
+    elif param_name.endswith("_in") and first_data_in is None:
+      first_data_in = (param_name, param_type, param_line, "# Data in")
+    elif param_name.endswith("_out") and first_data_out is None:
+      first_data_out = (param_name, param_type, param_line, "# Data out")
+  
+  # Check for comments on the lines before the first parameter of each category
+  categories = [
+    first_model, 
+    first_regular_data,
+    first_data_in, 
+    first_data_out
+  ]
+  
+  # Sort by line number to preserve order
+  categories = [c for c in categories if c is not None]
+  categories.sort(key=lambda x: x[2])
+  
+  # Check each category
+  for param_info in categories:
+    param_name, param_type, param_line, expected_comment = param_info
+    
+    # Check if the line before has the expected comment
+    if param_line > 0 and param_line < len(source_lines):
+      prev_line = source_lines[param_line - 1].strip()
+      if expected_comment not in prev_line:
+        issues.append(
+          MissingCommentIssue(
+            lineno=param_line,
+            kernel=node.name,
+            param_name=param_name,
+            param_type=param_type,
+            expected_comment=expected_comment,
+          )
+        )
 
 
 def analyze(code_string: str, filename: str = "<string>"):
@@ -321,6 +434,7 @@ def analyze(code_string: str, filename: str = "<string>"):
 
   try:
     tree = ast.parse(code_string, filename=filename)
+    source_lines = code_string.splitlines()
 
     for node in ast.walk(tree):
       # Only review kernel functions.
@@ -342,13 +456,18 @@ def analyze(code_string: str, filename: str = "<string>"):
         issues.append(KwArgsIssue(kernel=node.name, lineno=node.lineno))
 
       # Check parameter type annotations.
+      # TODO(btaba): check the types match Model/Data types.
       _check_parameter_types(node, issues)
+
+      # Check argument naming.
+      _check_argument_naming(node, issues)
 
       # Check argument positions.
       _check_argument_positions(node, issues)
+      
+      # Check parameter comments
+      _check_parameter_comments(node, issues, source_lines)
 
-      # TODO(btaba): check that Model fields start with #  Model coomment
-      # TODO(btaba): check that types match class field types
       # TODO(btaba): check that you never write to Model param or an _in field
 
   except SyntaxError as e:
