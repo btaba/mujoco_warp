@@ -62,6 +62,7 @@ def test_model_data_in_the_middle(
   xpos_out: wp.array(float, ndim=1),
   qvel_in: wp.array(float, ndim=1),
   qpos: wp.array(float, ndim=1),
+  haha,
 ):
   worldid = wp.tid()
   qvel_in[worldid] = xpos_out[worldid]

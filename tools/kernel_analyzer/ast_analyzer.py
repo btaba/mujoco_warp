@@ -1,5 +1,6 @@
 import ast
 import logging
+import inspect
 from typing import Any, Dict, List, Set
 import mujoco_warp as mjwarp
 import warp as wp
@@ -44,6 +45,8 @@ class KwArgsIssue:
 
 
 class TypeIssue:
+  """Check that parameter types are present and in a permissible set."""
+
   def __init__(
     self,
     lineno: int,
@@ -65,6 +68,29 @@ class TypeIssue:
     else:
       str += f"missing type annotation, expected one of: {self.expected_types}"
     return str
+
+
+class TypeMismatchIssue:
+  """Check that parameter types match the expected type."""
+
+  def __init__(
+    self,
+    lineno: int,
+    kernel: str,
+    param_name: str,
+    actual_type: str,
+    expected_type: str,
+    field_source: str,
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.param_name = param_name
+    self.actual_type = actual_type
+    self.expected_type = expected_type
+    self.field_source = field_source
+
+  def __str__(self):
+    return f"{self.lineno}: Kernel '{self.kernel}' parameter '{self.param_name}' has type '{self.actual_type}' but {self.field_source} field type is '{self.expected_type}'"
 
 
 class ArgPositionIssue:
@@ -147,6 +173,72 @@ class WriteToReadOnlyFieldIssue:
     return hash(str(self))
 
 
+def _get_annotation_info(node):
+  """Recursively analyze the type annotation and return a string representation."""
+  if node is None:
+    return ""
+
+  if isinstance(node, ast.Name):
+    return node.id
+
+  if isinstance(node, ast.Attribute):
+    if isinstance(node.value, ast.Name):
+      return f"{node.value.id}.{node.attr}"
+    elif isinstance(node.value, ast.Attribute):
+      parent_info = _get_annotation_info(node.value)
+      return f"{parent_info}.{node.attr}"
+    return node.attr
+
+  if isinstance(node, ast.Call):
+    func_name = _get_annotation_info(node.func)
+    args = []
+
+    for arg in node.args:
+      args.append(_get_annotation_info(arg))
+
+    for kw in node.keywords:
+      args.append(f"{kw.arg}={_get_annotation_info(kw.value)}")
+
+    return f"{func_name}({', '.join(args)})"
+
+  if isinstance(node, ast.Constant):
+    return str(node.value)
+
+  return str(type(node).__name__)
+
+
+def _get_class_annotations(class_name: str, src: str) -> Dict[str, str]:
+  """Return class field annotations by analyzing AST."""
+  tree = ast.parse(src)
+
+  model_annotations = {}
+  for node in ast.walk(tree):
+    if not isinstance(node, ast.ClassDef):
+      continue
+    if node.name != class_name:
+      continue
+
+    for item in node.body:
+      if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+        field_name = item.target.id
+        annotation_info = _get_annotation_info(item.annotation)
+        model_annotations[field_name] = annotation_info
+
+  return model_annotations
+
+
+def _get_model_field_annotations() -> Dict[str, str]:
+  """Return model field annotations by analyzing AST."""
+  src = inspect.getsource(mjwarp.Model)
+  return _get_class_annotations("Model", src)
+
+
+def _get_data_field_annotations() -> Dict[str, str]:
+  """Return data field annotations by analyzing AST."""
+  src = inspect.getsource(mjwarp.Data)
+  return _get_class_annotations("Data", src)
+
+
 def _get_valid_model_fields() -> Dict[str, Any]:
   """Return valid model fields."""
   return mjwarp.Model.__annotations__
@@ -158,6 +250,15 @@ def _get_valid_data_fields() -> Dict[str, Any]:
   fields_in = {k + "_in": v for k, v in fields.items()}
   fields_out = {k + "_out": v for k, v in fields.items()}
   return {**fields, **fields_in, **fields_out}
+
+
+def _canonicalize_data_field_name(field_name: str) -> str:
+  """Canonicalize data field name."""
+  if field_name.endswith("_in"):
+    return field_name[:-3]
+  elif field_name.endswith("_out"):
+    return field_name[:-4]
+  return field_name
 
 
 def _check_parameter_types(node: ast.FunctionDef, issues: List[TypeIssue]):
@@ -518,6 +619,47 @@ def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issu
     )
 
 
+def _check_field_type_annotations(
+  node: ast.FunctionDef, issues: List[TypeMismatchIssue], source_lines: List[str]
+):
+  """Check that type annotations match the original Model/Data annotations exactly."""
+  model_fields = _get_valid_model_fields().keys()
+  data_fields = _get_valid_data_fields().keys()
+  model_annotations = _get_model_field_annotations()
+  data_annotations = _get_data_field_annotations()
+
+  for param in node.args.args:
+    param_name = param.arg
+
+    if param_name in model_fields:
+      expected_type = model_annotations[param_name]
+      field_source = "Model"
+    elif param_name in data_fields:
+      param_name = _canonicalize_data_field_name(param_name)
+      expected_type = data_annotations[param_name]
+      field_source = "Data"
+    else:
+      continue
+
+    # Skip if there's no annotation (already handled by _check_parameter_types)
+    if param.annotation is None:
+      continue
+
+    # Recreate the type from the AST annotation.
+    actual_type = _get_annotation_info(param.annotation)
+    if actual_type != expected_type:
+      issues.append(
+        TypeMismatchIssue(
+          lineno=node.lineno,
+          kernel=node.name,
+          param_name=param_name,
+          actual_type=actual_type,
+          expected_type=expected_type,
+          field_source=field_source,
+        )
+      )
+
+
 def analyze(code_string: str, filename: str):
   """Parses Python code and finds functions with unsorted simple parameters."""
   issues = []
@@ -549,8 +691,7 @@ def analyze(code_string: str, filename: str):
       # Check parameter type annotations.
       _check_parameter_types(node, issues)
 
-      # TODO(btaba): Check field type annotations match original class.
-      # _check_field_type_annotations(node, issues, source_lines)
+      _check_field_type_annotations(node, issues, source_lines)
 
       # Check argument naming.
       _check_argument_naming(node, issues)
