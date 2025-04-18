@@ -17,37 +17,68 @@ _EXPECTED_TYPES = (
 )
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class DefaultParamsIssue(NamedTuple):
   """A kernel has default parameters."""
 
   lineno: int
   kernel: str
+=======
+class DefaultsParamsIssue:
+  """A kernel has default parameters."""
+
+  def __init__(self, lineno: int, kernel: str):
+    self.lineno = lineno
+    self.kernel = kernel
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' has default params"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class VarArgsIssue(NamedTuple):
   """A kernel has varargs."""
 
   lineno: int
   kernel: str
+=======
+class VarArgsIssue:
+  """A kernel has varargs."""
+
+  def __init__(self, lineno: int, kernel: str):
+    self.kernel = kernel
+    self.lineno = lineno
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' has varargs"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class KwArgsIssue(NamedTuple):
   """A kernel has kwargs."""
 
   lineno: int
   kernel: str
+=======
+class KwArgsIssue:
+  """A kernel has kwargs."""
+
+  def __init__(self, lineno: int, kernel: str):
+    self.kernel = kernel
+    self.lineno = lineno
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' has kwargs"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class TypeIssue(NamedTuple):
+=======
+class TypeIssue:
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
   """Parameter types are present but not in a permissible set."""
 
   lineno: int
@@ -59,13 +90,19 @@ class TypeIssue(NamedTuple):
   def __str__(self):
     str = f"Kernel '{self.kernel}' param: {self.param_name} "
     if self.param_type:
-      str += f"has type '{self.param_type}', expected one of: {self.expected_types}"
+      str += (
+        f"has type '{self.param_type}', expected one of: {self.expected_types}"
+      )
     else:
       str += f"missing type annotation, expected one of: {self.expected_types}"
     return str
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class TypeMismatchIssue(NamedTuple):
+=======
+class TypeMismatchIssue:
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
   """Parameter types do not match the expected type."""
 
   lineno: int
@@ -79,6 +116,7 @@ class TypeMismatchIssue(NamedTuple):
     return f"Kernel '{self.kernel}' parameter '{self.param_name}' has type '{self.actual_type}' but {self.field_source} field type is '{self.expected_type}'"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class ParameterPositionIssue(NamedTuple):
   """A kernel has a parameter in the wrong position."""
 
@@ -86,9 +124,23 @@ class ParameterPositionIssue(NamedTuple):
   kernel: str
   issue_type: str
   details: str
+=======
+class ArgPositionIssue:
+  """A kernel has an argument position issue."""
+
+  def __init__(
+    self, lineno: int, kernel: str, issue_type: str, details: str = ""
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.issue_type = issue_type
+    self.details = details
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
-    base_msg = f"Kernel '{self.kernel}' has argument position issue: {self.issue_type}"
+    base_msg = (
+      f"Kernel '{self.kernel}' has argument position issue: {self.issue_type}"
+    )
     if self.details:
       base_msg += f". {self.details}"
     return base_msg
@@ -104,16 +156,34 @@ class ModelFieldSuffixIssue(NamedTuple):
     return f"Kernel '{self.kernel}' has Model parameter '{self.param_name}' with '{self.suffix}' suffix. Model parameters should not have _in or _out suffixes."
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class DataFieldSuffixIssue(NamedTuple):
   lineno: int
   kernel: str
   param_name: str
   message: str
+=======
+class DataFieldSuffixIssue:
+  """Data field suffix is invalid."""
+
+  def __init__(
+    self,
+    lineno: int,
+    kernel: str,
+    param_name: str,
+    message: str,
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.param_name = param_name
+    self.message = message
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' has Data parameter '{self.param_name}' issue: {self.message}"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class MissingCommentIssue(NamedTuple):
   """A parameter is missing a comment."""
 
@@ -122,11 +192,30 @@ class MissingCommentIssue(NamedTuple):
   param_name: str
   param_type: str
   expected_comment: str
+=======
+class MissingCommentIssue:
+  """A parameter is missing a comment."""
+
+  def __init__(
+    self,
+    lineno: int,
+    kernel: str,
+    param_name: str,
+    param_type: str,
+    expected_comment: str,
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.param_name = param_name
+    self.param_type = param_type
+    self.expected_comment = expected_comment
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' parameter '{self.param_name}' of type '{self.param_type}' missing '{self.expected_comment}' comment"
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 class WriteToReadOnlyFieldIssue(NamedTuple):
   """A kernel writes to a read-only field."""
 
@@ -134,6 +223,18 @@ class WriteToReadOnlyFieldIssue(NamedTuple):
   kernel: str
   field_name: str
   field_type: str
+=======
+class WriteToReadOnlyFieldIssue:
+  """A kernel writes to a read-only field."""
+
+  def __init__(
+    self, lineno: int, kernel: str, field_name: str, field_type: str
+  ):
+    self.lineno = lineno
+    self.kernel = kernel
+    self.field_name = field_name
+    self.field_type = field_type
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
 
   def __str__(self):
     return f"Kernel '{self.kernel}' writes to {self.field_type} field '{self.field_name}' which should be read-only"
@@ -248,7 +349,13 @@ def _check_parameter_types(node: ast.FunctionDef, issues: List[TypeIssue]):
       param_type = param.annotation.id  # array2d, array3d, etc
     if param_type not in _EXPECTED_TYPES:
       issues.append(
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
         TypeIssue(param.lineno, node.name, param.arg, param_type, str(_EXPECTED_TYPES))
+=======
+        TypeIssue(
+          node.lineno, node.name, param.arg, param_type, str(_EXPECTED_TYPES)
+        )
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
       )
 
 
@@ -318,7 +425,13 @@ def _check_model_fields_before_data_fields(
       )
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 def _check_data_fields_order(node: ast.FunctionDef, issues: List[ParameterPositionIssue]):
+=======
+def _check_data_fields_order(
+  node: ast.FunctionDef, issues: List[ArgPositionIssue]
+):
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
   # Check that regular Data fields come before Data _in fields, which come before Data _out fields.
   data_fields = _get_valid_data_fields()
 
@@ -388,13 +501,19 @@ def _check_model_field_suffixes(
     if param_name.endswith("_in") and param_name[:-3] in model_fields:
       issues.append(
         ModelFieldSuffixIssue(
-          lineno=node.lineno, kernel=node.name, param_name=param_name, suffix="_in"
+          lineno=node.lineno,
+          kernel=node.name,
+          param_name=param_name,
+          suffix="_in",
         )
       )
     if param_name.endswith("_out") and param_name[:-3] in model_fields:
       issues.append(
         ModelFieldSuffixIssue(
-          lineno=node.lineno, kernel=node.name, param_name=param_name, suffix="_out"
+          lineno=node.lineno,
+          kernel=node.name,
+          param_name=param_name,
+          suffix="_out",
         )
       )
 
@@ -429,7 +548,13 @@ def _check_data_field_suffixes(
         )
 
 
+<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 def _check_argument_naming(node: ast.FunctionDef, issues: List[ParameterPositionIssue]):
+=======
+def _check_argument_naming(
+  node: ast.FunctionDef, issues: List[ArgPositionIssue]
+):
+>>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
   _check_model_field_suffixes(node, issues)
   _check_data_field_suffixes(node, issues)
 
@@ -441,7 +566,9 @@ def _check_argument_positions(node: ast.FunctionDef, issues: List):
 
 
 def _check_parameter_comments(
-  node: ast.FunctionDef, issues: List[MissingCommentIssue], source_lines: List[str]
+  node: ast.FunctionDef,
+  issues: List[MissingCommentIssue],
+  source_lines: List[str],
 ):
   """Check for comments on the line before the first occurrence of the first Model/Data field."""
   model_fields = _get_valid_model_fields()
@@ -537,7 +664,10 @@ def _check_no_writes_to_readonly_fields(
     param_name = param.arg
     if param_name in model_fields:
       readonly_params[param_name] = "Model"
-    elif param_name.endswith("_in") and param_name[:-3] in mjwarp.Data.__annotations__:
+    elif (
+      param_name.endswith("_in")
+      and param_name[:-3] in mjwarp.Data.__annotations__
+    ):
       readonly_params[param_name] = "Data input"
 
   new_issues = set()
@@ -555,7 +685,9 @@ def _check_no_writes_to_readonly_fields(
         body_item.target, readonly_params, node.name, new_issues
       )
     # Also check for in-place operations like a[i] = value
-    elif isinstance(body_item, ast.Subscript) and isinstance(body_item.ctx, ast.Store):
+    elif isinstance(body_item, ast.Subscript) and isinstance(
+      body_item.ctx, ast.Store
+    ):
       _check_target_for_readonly_writes(
         body_item.value, readonly_params, node.name, new_issues
       )
@@ -563,7 +695,9 @@ def _check_no_writes_to_readonly_fields(
   issues.extend(new_issues)
 
 
-def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issues):
+def _check_target_for_readonly_writes(
+  target, readonly_params, kernel_name, issues
+):
   """Check if an assignment target is writing to a read-only parameter."""
   target_name = None
 
@@ -593,7 +727,9 @@ def _check_target_for_readonly_writes(target, readonly_params, kernel_name, issu
 
 
 def _check_field_type_annotations(
-  node: ast.FunctionDef, issues: List[TypeMismatchIssue], source_lines: List[str]
+  node: ast.FunctionDef,
+  issues: List[TypeMismatchIssue],
+  source_lines: List[str],
 ):
   """Check that type annotations match the original Model/Data annotations exactly."""
   model_fields = _get_valid_model_fields().keys()
