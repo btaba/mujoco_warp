@@ -17,7 +17,7 @@
 import ast
 import inspect
 import logging
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Dict, List, Optional, NamedTuple
 
 import mujoco_warp as mjwarp
 
@@ -266,17 +266,7 @@ def _check_type_annotations_exist(node: ast.FunctionDef, issues: List[TypeIssue]
       param_type = param.annotation.id  # array2d, array3d, etc
     if param_type not in _EXPECTED_TYPES:
       issues.append(
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
         TypeIssue(param.lineno, node.name, param.arg, param_type, str(_EXPECTED_TYPES))
-=======
-        TypeIssue(
-          node.lineno, node.name, param.arg, param_type, str(_EXPECTED_TYPES)
-        )
->>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
-=======
-        TypeIssue(node.lineno, node.name, param.arg, param_type, str(_EXPECTED_TYPES))
->>>>>>> 08cfe5d (Add tests, fix bug, and more formatting.):tools/kernel_analyzer/ast_analyzer.py
       )
 
 
@@ -345,17 +335,9 @@ def _check_model_fields_before_data_fields(
       )
 
 
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
-def _check_data_fields_order(node: ast.FunctionDef, issues: List[ParameterPositionIssue]):
-=======
 def _check_data_fields_order(
-  node: ast.FunctionDef, issues: List[ArgPositionIssue]
+  node: ast.FunctionDef, issues: List[ParameterPositionIssue]
 ):
->>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
-=======
-def _check_data_fields_order(node: ast.FunctionDef, issues: List[ArgPositionIssue]):
->>>>>>> 08cfe5d (Add tests, fix bug, and more formatting.):tools/kernel_analyzer/ast_analyzer.py
   # Check that regular Data fields come before Data _in fields, which come before Data _out fields.
   data_fields = _get_valid_data_fields()
 
@@ -472,17 +454,7 @@ def _check_data_field_suffixes(
         )
 
 
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
-<<<<<<< HEAD:contrib/kernel_analyzer/kernel_analyzer/ast_analyzer.py
 def _check_argument_naming(node: ast.FunctionDef, issues: List[ParameterPositionIssue]):
-=======
-def _check_argument_naming(
-  node: ast.FunctionDef, issues: List[ArgPositionIssue]
-):
->>>>>>> 918a212 (Ruff.):tools/kernel_analyzer/ast_analyzer.py
-=======
-def _check_argument_naming(node: ast.FunctionDef, issues: List[ArgPositionIssue]):
->>>>>>> 08cfe5d (Add tests, fix bug, and more formatting.):tools/kernel_analyzer/ast_analyzer.py
   _check_model_field_suffixes(node, issues)
   _check_data_field_suffixes(node, issues)
 
@@ -708,7 +680,9 @@ def analyze(code_string: str, filename: str) -> List[Any]:
 
       # Defaults or kw defaults not allowed.
       if node.args.defaults or node.args.kw_defaults:
-        default = node.args.defaults[0] if node.args.defaults else node.args.kw_defaults[0]
+        default = (
+          node.args.defaults[0] if node.args.defaults else node.args.kw_defaults[0]
+        )
         issues.append(DefaultParamsIssue(kernel=node.name, lineno=default.lineno))
 
       # varargs not allowed.

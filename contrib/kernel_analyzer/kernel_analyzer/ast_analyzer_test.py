@@ -20,12 +20,11 @@ from absl.testing import absltest
 
 from .ast_analyzer import (
   analyze,
-  DefaultsParamsIssue,
+  DefaultParamsIssue,
   VarArgsIssue,
   KwArgsIssue,
   TypeIssue,
   TypeMismatchIssue,
-  ArgPositionIssue,
   ModelFieldSuffixIssue,
   DataFieldSuffixIssue,
   MissingCommentIssue,
@@ -75,51 +74,6 @@ from mujoco_warp.warp_util import kernel
 
 @kernel
 def test_type_mismatch(qpos0: array, geom_pos: array2d):
-    pass
-"""
-
-_ARG_POSITION_MIDDLE_CODE = """
-import warp as wp
-from mujoco_warp.warp_util import kernel
-
-@kernel
-def test_arg_position(qpos0: int, custom_param: int, qpos: int):
-    pass
-"""
-
-_MODEL_AFTER_DATA_CODE = """
-import warp as wp
-from mujoco_warp.warp_util import kernel
-
-@kernel
-def test_model_after_data(qpos: int, qpos0: int):
-    pass
-"""
-
-_DATA_ORDER_CODE_0 = """
-import warp as wp
-from mujoco_warp.warp_util import kernel
-
-@kernel
-def test_data_order(qpos_in: int, qpos: int):
-    pass
-"""
-
-_DATA_ORDER_CODE_1 = """
-import warp as wp
-from mujoco_warp.warp_util import kernel
-
-@kernel
-def test_data_order(qpos_out: int, qpos: int):
-    pass
-"""
-
-_DATA_ORDER_CODE_2 = """
-import warp as wp
-from mujoco_warp.warp_util import kernel
-
-@kernel
-def test_data_order(qpos_out: int, qpos_in: int):
     pass
 """
 
@@ -233,7 +187,7 @@ class TestAnalyzer(absltest.TestCase):
   def test_default_params_issue(self):
     """Test that default parameters raise an issue."""
     issues = _analyze_str(_DEFAULT_PARAMS_CODE)
-    _assert_has_issue(issues, DefaultsParamsIssue)
+    _assert_has_issue(issues, DefaultParamsIssue)
 
   def test_varargs_issue(self):
     """Test that varargs raise an issue."""
@@ -254,27 +208,6 @@ class TestAnalyzer(absltest.TestCase):
     """Test that type mismatches raise an issue."""
     issues = _analyze_str(_TYPE_MISMATCH_CODE)
     _assert_has_issue(issues, TypeMismatchIssue)
-
-  def test_arg_position_issue_model_data_middle(self):
-    """Test that non-model/data parameters in the middle raise an issue."""
-    issues = _analyze_str(_ARG_POSITION_MIDDLE_CODE)
-    _assert_has_issue(issues, ArgPositionIssue)
-
-  def test_arg_position_issue_model_after_data(self):
-    """Test that model fields after data fields raise an issue."""
-    issues = _analyze_str(_MODEL_AFTER_DATA_CODE)
-    _assert_has_issue(issues, ArgPositionIssue)
-
-  def test_arg_position_issue_data_order(self):
-    """Test that data fields in the wrong order raise an issue."""
-    issues = _analyze_str(_DATA_ORDER_CODE_0)
-    _assert_has_issue(issues, ArgPositionIssue)
-
-    issues = _analyze_str(_DATA_ORDER_CODE_1)
-    _assert_has_issue(issues, ArgPositionIssue)
-
-    issues = _analyze_str(_DATA_ORDER_CODE_2)
-    _assert_has_issue(issues, ArgPositionIssue)
 
   def test_model_field_suffix_issue(self):
     """Test that model fields with suffixes raise an issue."""
@@ -303,11 +236,10 @@ class TestAnalyzer(absltest.TestCase):
     """Test a function with all issue types."""
     issues = _analyze_str(_ALL_ISSUES_CODE)
     expected_types = [
-      DefaultsParamsIssue,
+      DefaultParamsIssue,
       VarArgsIssue,
       KwArgsIssue,
       TypeIssue,
-      ArgPositionIssue,
       ModelFieldSuffixIssue,
       DataFieldSuffixIssue,
       MissingCommentIssue,
