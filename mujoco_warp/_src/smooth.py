@@ -353,7 +353,7 @@ def kinematics_(
 ):
   """Forward kinematics."""
 
-  nworld = qpos.shape[0]
+  nworld = wp.static(qpos.shape[0])
   nbody = body_parentid.shape[0]
   ngeom = geom_bodyid.shape[0]
   nsite = site_bodyid.shape[0]
