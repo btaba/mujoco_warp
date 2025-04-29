@@ -330,8 +330,38 @@ def site_local_to_global(
   )
 
 
+@kernel
+def mocap(
+  # Model inputs
+  mocap_bodyid: wp.array(dtype=int),
+  body_iquat: wp.array(dtype=wp.quat),
+  body_ipos: wp.array(dtype=wp.vec3),
+  # Data Inputs
+  mocap_pos: wp.array2d(dtype=wp.vec3),
+  mocap_quat: wp.array2d(dtype=wp.quat),
+  # Data Outputs
+  xpos: wp.array2d(dtype=wp.vec3),
+  xquat: wp.array2d(dtype=wp.quat),
+  xmat: wp.array2d(dtype=wp.mat33),
+  xipos: wp.array2d(dtype=wp.vec3),
+  ximat: wp.array2d(dtype=wp.mat33),
+):
+  worldid, mocapid = wp.tid()
+  bodyid = mocap_bodyid[mocapid]
+  mocap_quat2 = wp.normalize(mocap_quat[worldid, mocapid])
+  xpos2 = mocap_pos[worldid, mocapid]
+  xpos[worldid, bodyid] = xpos2
+  xquat[worldid, bodyid] = mocap_quat2
+  xmat[worldid, bodyid] = math.quat_to_mat(mocap_quat2)
+  xipos[worldid, bodyid] = xpos2 + math.rot_vec_quat(body_ipos[bodyid], mocap_quat2)
+  ximat[worldid, bodyid] = math.quat_to_mat(
+    math.mul_quat(mocap_quat2, body_iquat[bodyid])
+  )
+
+
 def kinematics_(
   # Model Inputs
+  nmocap: int,
   body_tree: wp.array(dtype=int),
   qpos0: wp.array(dtype=float),
   body_parentid: wp.array(dtype=int),
@@ -353,8 +383,11 @@ def kinematics_(
   site_bodyid: wp.array(dtype=int),
   site_pos: wp.array(dtype=wp.vec3),
   site_quat: wp.array(dtype=wp.quat),
+  mocap_bodyid: wp.array(dtype=int),
   # Data Inputs
   qpos: wp.array2d(dtype=float),
+  mocap_pos: wp.array2d(dtype=wp.vec3),
+  mocap_quat: wp.array2d(dtype=wp.quat),
   # Outputs
   xpos: wp.array2d(dtype=wp.vec3),
   xquat: wp.array2d(dtype=wp.quat),
@@ -371,9 +404,9 @@ def kinematics_(
   """Forward kinematics."""
 
   nworld = wp.static(qpos.shape[0])
-  nbody = body_parentid.shape[0]
-  ngeom = geom_bodyid.shape[0]
-  nsite = site_bodyid.shape[0]
+  nbody = wp.static(body_parentid.shape[0])
+  ngeom = wp.static(geom_bodyid.shape[0])
+  nsite = wp.static(site_bodyid.shape[0])
 
   # Launch kernels with explicit arguments
   wp.launch(_root, dim=(nworld), inputs=[], outputs=[xpos, xquat, xmat, xipos, ximat])
@@ -393,6 +426,14 @@ def kinematics_(
           beg # Static arg
         ],
         outputs=[xpos, xquat, xmat, xipos, ximat, xanchor, xaxis]
+    )
+
+  if nmocap > 0:
+    wp.launch(
+      mocap,
+      dim=(nworld, nmocap),
+      inputs=[mocap_bodyid, body_iquat, body_ipos, mocap_pos, mocap_quat],
+      outputs=[xpos, xquat, xmat, xipos, ximat]
     )
 
   if ngeom > 0:

@@ -95,6 +95,7 @@ class SmoothTest(parameterized.TestCase):
 
     mjwarp._src.smooth.kinematics_(
       # Model Inputs
+      m.nmocap,
       m.body_tree,
       m.qpos0,
       m.body_parentid,
@@ -115,8 +116,11 @@ class SmoothTest(parameterized.TestCase):
       m.site_bodyid,
       m.site_pos,
       m.site_quat,
+      m.mocap_bodyid,
       # Data Inputs
       d.qpos,
+      d.mocap_pos,
+      d.mocap_quat,
       # Outputs
       d.xpos,
       d.xquat,
