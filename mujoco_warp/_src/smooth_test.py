@@ -42,9 +42,6 @@ class SmoothTest(parameterized.TestCase):
   def test_kinematics(self):
     """Tests kinematics."""
     _, mjd, m, d = test_util.fixture("pendula.xml")
-    # randomize mocap
-    mjd.mocap_pos = np.random.random(mjd.mocap_pos.shape)
-    mjd.mocap_quat = np.random.random(mjd.mocap_quat.shape)
 
     for arr in (
       d.xanchor,
