@@ -361,7 +361,6 @@ def mocap(
 
 def kinematics_(
   # Model Inputs
-  nmocap: int,
   body_tree: wp.array(dtype=int),
   qpos0: wp.array(dtype=float),
   body_parentid: wp.array(dtype=int),
@@ -407,6 +406,7 @@ def kinematics_(
   nbody = wp.static(body_parentid.shape[0])
   ngeom = wp.static(geom_bodyid.shape[0])
   nsite = wp.static(site_bodyid.shape[0])
+  nmocap = wp.static(mocap_bodyid.shape[0])
 
   # Launch kernels with explicit arguments
   wp.launch(_root, dim=(nworld), inputs=[], outputs=[xpos, xquat, xmat, xipos, ximat])
