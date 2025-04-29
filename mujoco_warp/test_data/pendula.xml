@@ -119,7 +119,7 @@
     </body>
 
     <!-- triple pendulum of hinges with gravcomp -->
-    <!-- <body pos="3.0 0 0" gravcomp="1">
+    <body pos="3.0 0 0" gravcomp="1">
       <joint name="joint15" axis="0.1 0.2 0.3" type="hinge"/>
       <geom/>
       <body pos="0 0 -0.8" gravcomp="2">
@@ -130,7 +130,7 @@
           <geom/>
         </body>
       </body>
-    </body> -->
+    </body>
 
     <body mocap="true">
       <geom type="sphere" size="0.05"/>
