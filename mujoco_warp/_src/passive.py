@@ -173,7 +173,7 @@ def _spring_damper_tendon_passive(
 @wp.kernel
 def _gravity_force(
   # Model:
-  opt_gravity: wp.vec3,
+  opt_gravity: wp.array(dtype=wp.vec3),
   body_parentid: wp.array(dtype=int),
   body_rootid: wp.array(dtype=int),
   body_mass: wp.array2d(dtype=float),
@@ -189,9 +189,10 @@ def _gravity_force(
   worldid, bodyid, dofid = wp.tid()
   bodyid += 1  # skip world body
   gravcomp = body_gravcomp[worldid, bodyid]
+  opt_gravity_ = opt_gravity[worldid]
 
   if gravcomp:
-    force = -opt_gravity * body_mass[worldid, bodyid] * gravcomp
+    force = -opt_gravity_ * body_mass[worldid, bodyid] * gravcomp
 
     pos = xipos_in[worldid, bodyid]
     jac, _ = support.jac(body_parentid, body_rootid, dof_bodyid, subtree_com_in, cdof_in, pos, bodyid, dofid, worldid)
@@ -202,7 +203,7 @@ def _gravity_force(
 @wp.kernel
 def _box_fluid(
   # Model:
-  opt_wind: wp.vec3,
+  opt_wind: wp.array(dtype=wp.vec3),
   opt_density: float,
   opt_viscosity: float,
   body_rootid: wp.array(dtype=int),
@@ -219,6 +220,7 @@ def _box_fluid(
   """Fluid forces based on inertia-box approximation."""
 
   worldid, bodyid = wp.tid()
+  opt_wind_ = opt_wind[worldid]
 
   # map from CoM-centered to local body-centered 6D velocity
 
@@ -238,9 +240,9 @@ def _box_fluid(
   lvel_torque = rotT @ torque
   lvel_force = rotT @ force
 
-  if opt_wind[0] or opt_wind[1] or opt_wind[2]:
+  if opt_wind_[0] or opt_wind_[1] or opt_wind_[2]:
     # subtract translational component from body velocity
-    lvel_force -= rotT @ opt_wind
+    lvel_force -= rotT @ opt_wind_
 
   lfrc_torque = wp.vec3(0.0)
   lfrc_force = wp.vec3(0.0)
@@ -513,7 +515,7 @@ def passive(m: Model, d: Data):
       outputs=[d.qfrc_gravcomp],
     )
 
-  fluid = m.opt.density or m.opt.viscosity or m.opt.wind[0] or m.opt.wind[1] or m.opt.wind[2]
+  fluid = m.opt.density or m.opt.viscosity or m.opt.has_wind
   if fluid:
     _fluid(m, d)
 

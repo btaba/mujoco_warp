@@ -404,6 +404,7 @@ class Option:
     depth_extension: distance for which the closest point is not calculated for non-intersecting case in the convex narrowphase
     ls_parallel: evaluate engine solver step sizes in parallel
     wind: wind (for lift, drag, and viscosity)
+    has_wind: has wind
     density: density of medium
     viscosity: viscosity of medium
   """
@@ -412,7 +413,7 @@ class Option:
   impratio: float
   tolerance: float
   ls_tolerance: float
-  gravity: wp.vec3
+  gravity: wp.array(dtype=wp.vec3)
   integrator: int
   cone: int
   solver: int
@@ -425,7 +426,8 @@ class Option:
   epa_exact_neg_distance: bool  # warp only
   depth_extension: float  # warp only
   ls_parallel: bool
-  wind: wp.vec3
+  wind: wp.array(dtype=wp.vec3)
+  has_wind: bool
   density: float
   viscosity: float
 

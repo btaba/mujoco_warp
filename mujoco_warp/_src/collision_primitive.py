@@ -121,7 +121,9 @@ def write_contact(
 ):
   active = (dist_in - margin_in) < 0
   if active:
+    wp.printf("BEFORE Add contact %d for worldid %d, with geoms (%d, %d)\n", ncon_out[0], worldid_in, geoms_in[0], geoms_in[1])
     cid = wp.atomic_add(ncon_out, 0, 1)
+    wp.printf("Add contact %d for worldid %d, with geoms (%d, %d)\n", cid, worldid_in, geoms_in[0], geoms_in[1])
     if cid < nconmax_in:
       contact_dist_out[cid] = dist_in
       contact_pos_out[cid] = pos_in
@@ -2354,6 +2356,7 @@ def box_box(
 
   frame = make_frame(normal)
   coff = wp.atomic_add(ncon_out, 0, n)
+  wp.printf("ncon_out: %d", ncon_out)
 
   for i in range(min(nconmax_in - coff, n)):
     points[i, 2] += hz

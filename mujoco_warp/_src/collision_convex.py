@@ -749,6 +749,7 @@ def _gjk_epa_pipeline(
     contact_worldid_out: wp.array(dtype=int),
   ):
     tid = wp.tid()
+    wp.printf("GJK ncon: %d\n", ncon_out[0])
     if tid >= ncollision_in[0]:
       return
 

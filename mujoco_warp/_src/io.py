@@ -250,6 +250,9 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
 
   def create_nmodel_batched_array(mjm_array, dtype):
     array = wp.array(mjm_array, dtype=dtype)
+    if array.shape == (1,):
+      array.strides = (0,) + array.strides
+      return array
     array.ndim += 1
     array.shape = (1,) + array.shape
     array.strides = (0,) + array.strides
@@ -288,8 +291,9 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
       timestep=mjm.opt.timestep,
       tolerance=mjm.opt.tolerance,
       ls_tolerance=mjm.opt.ls_tolerance,
-      gravity=wp.vec3(mjm.opt.gravity),
-      wind=wp.vec3(mjm.opt.wind[0], mjm.opt.wind[1], mjm.opt.wind[2]),
+      gravity=create_nmodel_batched_array(wp.vec3(mjm.opt.gravity), dtype=wp.vec3),
+      wind=create_nmodel_batched_array(wp.vec3(mjm.opt.wind[0], mjm.opt.wind[1], mjm.opt.wind[2]), dtype=wp.vec3),
+      has_wind=(mjm.opt.wind > 0).any(),
       density=mjm.opt.density,
       viscosity=mjm.opt.viscosity,
       cone=mjm.opt.cone,
