@@ -66,7 +66,8 @@ class JAXTest(absltest.TestCase):
         return qpos, qvel
 
       mjm, mjd, m, d = fixture(
-        "humanoid/humanoid.xml",
+        # "humanoid/humanoid.xml",
+        "pendula.xml",
         nworld=NWORLDS,
         nconmax=NWORLDS * NCONTACTS,
         njmax=NWORLDS * NCONTACTS * 4,
