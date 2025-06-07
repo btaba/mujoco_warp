@@ -85,9 +85,7 @@ def _add_geom_pair(
   collision_worldid_out: wp.array(dtype=int),
   ncollision_out: wp.array(dtype=int),
 ):
-  wp.printf("NCollision before: %d\n", ncollision_out[0])
   pairid = wp.atomic_add(ncollision_out, 0, 1)
-  wp.printf("NCollision after: %d\n", ncollision_out[0])
 
   if pairid >= nconmax_in:
     return
@@ -359,7 +357,6 @@ def _nxn_broadphase(
   ncollision_out: wp.array(dtype=int),
 ):
   worldid, elementid = wp.tid()
-  wp.printf("BEFORE ncon: %d\n", ncon_in[0])
 
   # check for valid geom pair
   if nxn_pairid[elementid] < -1:
@@ -430,8 +427,6 @@ def collision(m: Model, d: Data):
 
   d.ncollision.zero_()
   d.ncon.zero_()
-  print("NCOLLISION ptr", d.ncollision.ptr)
-  print("NCON ptr", d.ncon.ptr)
 
   if d.nconmax == 0:
     return
