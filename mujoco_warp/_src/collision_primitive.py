@@ -2354,7 +2354,6 @@ def box_box(
 
   frame = make_frame(normal)
   coff = wp.atomic_add(ncon_out, 0, n)
-  wp.printf("ncon_out: %d", ncon_out)
 
   for i in range(min(nconmax_in - coff, n)):
     points[i, 2] += hz

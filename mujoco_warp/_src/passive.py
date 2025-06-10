@@ -214,6 +214,8 @@ def _box_fluid(
   ximat_in: wp.array2d(dtype=wp.mat33),
   subtree_com_in: wp.array2d(dtype=wp.vec3),
   cvel_in: wp.array2d(dtype=wp.spatial_vector),
+  # In:
+  has_wind: bool,
   # Data out:
   fluid_applied_out: wp.array2d(dtype=wp.spatial_vector),
 ):
@@ -240,7 +242,7 @@ def _box_fluid(
   lvel_torque = rotT @ torque
   lvel_force = rotT @ force
 
-  if opt_wind_[0] or opt_wind_[1] or opt_wind_[2]:
+  if has_wind:
     # subtract translational component from body velocity
     lvel_force -= rotT @ opt_wind_
 
@@ -299,6 +301,7 @@ def _fluid(m: Model, d: Data):
     _box_fluid,
     dim=(d.nworld, m.nbody),
     inputs=[
+      m.opt.has_wind,
       m.opt.wind,
       m.opt.density,
       m.opt.viscosity,

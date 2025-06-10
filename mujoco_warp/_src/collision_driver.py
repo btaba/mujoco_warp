@@ -347,7 +347,6 @@ def _nxn_broadphase(
   nxn_pairid: wp.array(dtype=int),
   # Data in:
   nconmax_in: int,
-  ncon_in: wp.array(dtype=int),
   geom_xpos_in: wp.array2d(dtype=wp.vec3),
   geom_xmat_in: wp.array2d(dtype=wp.mat33),
   # Data out:
@@ -404,7 +403,6 @@ def nxn_broadphase(m: Model, d: Data):
         m.nxn_geom_pair,
         m.nxn_pairid,
         d.nconmax,
-        d.ncon,
         d.geom_xpos,
         d.geom_xmat,
       ],
@@ -438,11 +436,11 @@ def collision(m: Model, d: Data):
   # TODO(team): determine ngeom to switch from n^2 to sap
   if m.ngeom <= 100:
     nxn_broadphase(m, d)
-  # else:
-  #   sap_broadphase(m, d)
+  else:
+    sap_broadphase(m, d)
 
   # TODO(team): we should reject far-away contacts in the narrowphase instead of constraint
   #             partitioning because we can move some pressure of the atomics
   # TODO(team) switch between collision functions and GJK/EPA here
-  # gjk_narrowphase(m, d)
+  gjk_narrowphase(m, d)
   primitive_narrowphase(m, d)

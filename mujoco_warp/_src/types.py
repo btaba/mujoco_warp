@@ -404,7 +404,7 @@ class Option:
     depth_extension: distance for which the closest point is not calculated for non-intersecting case in the convex narrowphase
     ls_parallel: evaluate engine solver step sizes in parallel
     wind: wind (for lift, drag, and viscosity)
-    has_wind: has wind
+    has_wind: has non-zero wind component at put_model time
     density: density of medium
     viscosity: viscosity of medium
   """
