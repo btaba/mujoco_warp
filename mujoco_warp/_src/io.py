@@ -250,12 +250,11 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
 
   def create_nmodel_batched_array(mjm_array, dtype):
     array = wp.array(mjm_array, dtype=dtype)
+    array.strides = (0,) + array.strides
     if array.shape == (1,):
-      array.strides = (0,) + array.strides
       return array
     array.ndim += 1
     array.shape = (1,) + array.shape
-    array.strides = (0,) + array.strides
     return array
 
   m = types.Model(
