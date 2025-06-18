@@ -953,9 +953,9 @@ def put_data(
 
   nworld = nworld or 1
   # TODO(team): better heuristic for nconmax
-  nconmax = nconmax or max(512, mjd.ncon * nworld)
+  nconmax = nconmax or max(512, mjd.ncon * nworld * 10)
   # TODO(team): better heuristic for njmax
-  njmax = njmax or max(512, mjd.nefc * nworld)
+  njmax = njmax or max(512, mjd.nefc * nworld * 10)
 
   if nworld < 1:
     raise ValueError("nworld must be >= 1")
@@ -1257,14 +1257,10 @@ def put_data(
   )
 
 
-def get_data_into(
-  result: mujoco.MjData,
-  mjm: mujoco.MjModel,
-  d: types.Data,
-):
+def get_data_into(result: mujoco.MjData, mjm: mujoco.MjModel, d: types.Data, idx: int = 0):
   """Gets Data from a device into an existing mujoco.MjData."""
-  if d.nworld > 1:
-    raise NotImplementedError("only nworld == 1 supported for now")
+  # if d.nworld > 1:
+  #   raise NotImplementedError("only nworld == 1 supported for now")
 
   result.solver_niter[0] = d.solver_niter.numpy()[0]
 
@@ -1274,69 +1270,72 @@ def get_data_into(
   if ncon != result.ncon or nefc != result.nefc:
     mujoco._functions._realloc_con_efc(result, ncon=ncon, nefc=nefc)
 
-  result.time = d.time.numpy()[0]
-  result.energy = d.energy.numpy()[0]
+  result.time = d.time.numpy()[idx]
+  result.energy = d.energy.numpy()[idx]
   result.ne = d.ne.numpy()[0]
-  result.qpos[:] = d.qpos.numpy()[0]
-  result.qvel[:] = d.qvel.numpy()[0]
-  result.qacc_warmstart = d.qacc_warmstart.numpy()[0]
-  result.qfrc_applied = d.qfrc_applied.numpy()[0]
-  result.mocap_pos = d.mocap_pos.numpy()[0]
-  result.mocap_quat = d.mocap_quat.numpy()[0]
-  result.qacc = d.qacc.numpy()[0]
-  result.xanchor = d.xanchor.numpy()[0]
-  result.xaxis = d.xaxis.numpy()[0]
-  result.xmat = d.xmat.numpy().reshape((-1, 9))
-  result.xpos = d.xpos.numpy()[0]
-  result.xquat = d.xquat.numpy()[0]
-  result.xipos = d.xipos.numpy()[0]
-  result.ximat = d.ximat.numpy().reshape((-1, 9))
-  result.subtree_com = d.subtree_com.numpy()[0]
-  result.geom_xpos = d.geom_xpos.numpy()[0]
-  result.geom_xmat = d.geom_xmat.numpy().reshape((-1, 9))
-  result.site_xpos = d.site_xpos.numpy()[0]
-  result.site_xmat = d.site_xmat.numpy().reshape((-1, 9))
-  result.cam_xpos = d.cam_xpos.numpy()[0]
-  result.cam_xmat = d.cam_xmat.numpy().reshape((-1, 9))
-  result.light_xpos = d.light_xpos.numpy()[0]
-  result.light_xdir = d.light_xdir.numpy()[0]
-  result.cinert = d.cinert.numpy()[0]
-  result.flexvert_xpos = d.flexvert_xpos.numpy()[0]
-  result.flexedge_length = d.flexedge_length.numpy()[0]
-  result.flexedge_velocity = d.flexedge_velocity.numpy()[0]
-  result.cdof = d.cdof.numpy()[0]
-  result.crb = d.crb.numpy()[0]
-  result.qLDiagInv = d.qLDiagInv.numpy()[0]
-  result.ctrl = d.ctrl.numpy()[0]
-  result.ten_velocity = d.ten_velocity.numpy()[0]
-  result.actuator_velocity = d.actuator_velocity.numpy()[0]
-  result.actuator_force = d.actuator_force.numpy()[0]
-  result.actuator_length = d.actuator_length.numpy()[0]
+  result.qpos[:] = d.qpos.numpy()[idx]
+  result.qvel[:] = d.qvel.numpy()[idx]
+  result.qacc_warmstart = d.qacc_warmstart.numpy()[idx]
+  result.qfrc_applied = d.qfrc_applied.numpy()[idx]
+  result.mocap_pos = d.mocap_pos.numpy()[idx]
+  result.mocap_quat = d.mocap_quat.numpy()[idx]
+  result.qacc = d.qacc.numpy()[idx]
+  result.xanchor = d.xanchor.numpy()[idx]
+  result.xaxis = d.xaxis.numpy()[idx]
+  result.xmat = d.xmat.numpy().reshape((-1, 9))[idx]
+  result.xpos = d.xpos.numpy()[idx]
+  result.xquat = d.xquat.numpy()[idx]
+  result.xipos = d.xipos.numpy()[idx]
+  result.ximat = d.ximat.numpy().reshape((-1, 9))[idx]
+  result.subtree_com = d.subtree_com.numpy()[idx]
+  result.geom_xpos = d.geom_xpos.numpy()[idx]
+  result.geom_xmat = d.geom_xmat.numpy()[idx].reshape((-1, 9))
+  if mjm.nsite:
+    result.site_xpos = d.site_xpos.numpy()[idx]
+    result.site_xmat = d.site_xmat.numpy().reshape((-1, 9))[idx]
+  if mjm.ncam:
+    result.cam_xpos = d.cam_xpos.numpy()[idx]
+    result.cam_xmat = d.cam_xmat.numpy().reshape((-1, 9))[idx]
+  if mjm.nlight:
+    result.light_xpos = d.light_xpos.numpy()[idx]
+    result.light_xdir = d.light_xdir.numpy()[idx]
+  result.cinert = d.cinert.numpy()[idx]
+  result.flexvert_xpos = d.flexvert_xpos.numpy()[idx]
+  result.flexedge_length = d.flexedge_length.numpy()[idx]
+  result.flexedge_velocity = d.flexedge_velocity.numpy()[idx]
+  result.cdof = d.cdof.numpy()[idx]
+  result.crb = d.crb.numpy()[idx]
+  result.qLDiagInv = d.qLDiagInv.numpy()[idx]
+  result.ctrl = d.ctrl.numpy()[idx]
+  result.ten_velocity = d.ten_velocity.numpy()[idx]
+  result.actuator_velocity = d.actuator_velocity.numpy()[idx]
+  result.actuator_force = d.actuator_force.numpy()[idx]
+  result.actuator_length = d.actuator_length.numpy()[idx]
   mujoco.mju_dense2sparse(
     result.actuator_moment,
-    d.actuator_moment.numpy()[0],
+    d.actuator_moment.numpy()[idx],
     result.moment_rownnz,
     result.moment_rowadr,
     result.moment_colind,
   )
-  result.cvel = d.cvel.numpy()[0]
-  result.cdof_dot = d.cdof_dot.numpy()[0]
-  result.qfrc_bias = d.qfrc_bias.numpy()[0]
-  result.qfrc_fluid = d.qfrc_fluid.numpy()[0]
-  result.qfrc_passive = d.qfrc_passive.numpy()[0]
-  result.subtree_linvel = d.subtree_linvel.numpy()[0]
-  result.subtree_angmom = d.subtree_angmom.numpy()[0]
-  result.qfrc_spring = d.qfrc_spring.numpy()[0]
-  result.qfrc_damper = d.qfrc_damper.numpy()[0]
-  result.qfrc_gravcomp = d.qfrc_gravcomp.numpy()[0]
-  result.qfrc_fluid = d.qfrc_fluid.numpy()[0]
-  result.qfrc_actuator = d.qfrc_actuator.numpy()[0]
-  result.qfrc_smooth = d.qfrc_smooth.numpy()[0]
-  result.qfrc_constraint = d.qfrc_constraint.numpy()[0]
-  result.qfrc_inverse = d.qfrc_inverse.numpy()[0]
-  result.qacc_smooth = d.qacc_smooth.numpy()[0]
-  result.act = d.act.numpy()[0]
-  result.act_dot = d.act_dot.numpy()[0]
+  result.cvel = d.cvel.numpy()[idx]
+  result.cdof_dot = d.cdof_dot.numpy()[idx]
+  result.qfrc_bias = d.qfrc_bias.numpy()[idx]
+  result.qfrc_fluid = d.qfrc_fluid.numpy()[idx]
+  result.qfrc_passive = d.qfrc_passive.numpy()[idx]
+  result.subtree_linvel = d.subtree_linvel.numpy()[idx]
+  result.subtree_angmom = d.subtree_angmom.numpy()[idx]
+  result.qfrc_spring = d.qfrc_spring.numpy()[idx]
+  result.qfrc_damper = d.qfrc_damper.numpy()[idx]
+  result.qfrc_gravcomp = d.qfrc_gravcomp.numpy()[idx]
+  result.qfrc_fluid = d.qfrc_fluid.numpy()[idx]
+  result.qfrc_actuator = d.qfrc_actuator.numpy()[idx]
+  result.qfrc_smooth = d.qfrc_smooth.numpy()[idx]
+  result.qfrc_constraint = d.qfrc_constraint.numpy()[idx]
+  result.qfrc_inverse = d.qfrc_inverse.numpy()[idx]
+  result.qacc_smooth = d.qacc_smooth.numpy()[idx]
+  result.act = d.act.numpy()[idx]
+  result.act_dot = d.act_dot.numpy()[idx]
 
   result.contact.dist[:] = d.contact.dist.numpy()[:ncon]
   result.contact.pos[:] = d.contact.pos.numpy()[:ncon]
@@ -1370,8 +1369,8 @@ def get_data_into(
     # TODO(team): set efc_J after fix to _realloc_con_efc lands
     # if nefc > 0:
     #   result.efc_J[:nefc * mjm.nv] = d.efc_J.numpy()[:nefc].flatten()
-  result.xfrc_applied[:] = d.xfrc_applied.numpy()[0]
-  result.eq_active[:] = d.eq_active.numpy()[0]
+  result.xfrc_applied[:] = d.xfrc_applied.numpy()[idx]
+  result.eq_active[:] = d.eq_active.numpy()[idx]
 
   # TODO(team): set these efc_* fields after fix to _realloc_con_efc
   # Safely copy only up to the minimum of the destination and source sizes
@@ -1389,19 +1388,19 @@ def get_data_into(
   # n_margin = min(result.efc_margin.shape[0], d.efc.margin.numpy()[:nefc].shape[0])
   # result.efc_margin[:n_margin] = d.efc.margin.numpy()[:nefc][:n_margin]
 
-  result.cacc[:] = d.cacc.numpy()[0]
-  result.cfrc_int[:] = d.cfrc_int.numpy()[0]
-  result.cfrc_ext[:] = d.cfrc_ext.numpy()[0]
+  result.cacc[:] = d.cacc.numpy()[idx]
+  result.cfrc_int[:] = d.cfrc_int.numpy()[idx]
+  result.cfrc_ext[:] = d.cfrc_ext.numpy()[idx]
 
   # TODO: other efc_ fields, anything else missing
 
   # tendon
-  result.ten_length[:] = d.ten_length.numpy()[0]
-  result.ten_J[:] = d.ten_J.numpy()[0]
-  result.ten_wrapadr[:] = d.ten_wrapadr.numpy()[0]
-  result.ten_wrapnum[:] = d.ten_wrapnum.numpy()[0]
-  result.wrap_obj[:] = d.wrap_obj.numpy()[0]
-  result.wrap_xpos[:] = d.wrap_xpos.numpy()[0]
+  result.ten_length[:] = d.ten_length.numpy()[idx]
+  result.ten_J[:] = d.ten_J.numpy()[idx]
+  result.ten_wrapadr[:] = d.ten_wrapadr.numpy()[idx]
+  result.ten_wrapnum[:] = d.ten_wrapnum.numpy()[idx]
+  result.wrap_obj[:] = d.wrap_obj.numpy()[idx]
+  result.wrap_xpos[:] = d.wrap_xpos.numpy()[idx]
 
   # sensors
-  result.sensordata[:] = d.sensordata.numpy()
+  result.sensordata[:] = d.sensordata.numpy()[idx]

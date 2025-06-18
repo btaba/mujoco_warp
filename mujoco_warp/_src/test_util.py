@@ -185,14 +185,23 @@ def benchmark(
     graph = capture.graph
 
     run_beg = time.perf_counter()
-    for _ in range(nstep):
+    for i in range(nstep):
       wp.capture_launch(graph)
       if trace:
         trace = _sum(trace, tracer.trace())
       else:
         trace = tracer.trace()
-      if measure_alloc or measure_solver_niter:
-        wp.synchronize()
+
+      # if measure_alloc or measure_solver_niter:
+      wp.synchronize()
+
+      cond = are_spd(d.qM.numpy())
+      print(i)
+      if not cond:
+        import IPython
+
+        IPython.embed(user_ns=dict(globals(), **locals()))
+
       if measure_alloc:
         ncon.append(d.ncon.numpy()[0])
         nefc.append(d.nefc.numpy()[0])
@@ -204,3 +213,13 @@ def benchmark(
     run_duration = run_end - run_beg
 
   return jit_duration, run_duration, trace, ncon, nefc, solver_niter
+
+
+def are_spd(mass):
+  is_symmetric = np.allclose(mass.transpose((0, 2, 1)), mass)
+  try:
+    eigenvalues = np.linalg.eigvalsh(mass)
+    is_positive_definite = np.all(eigenvalues > 0, axis=1)
+  except np.linalg.LinAlgError:
+    is_positive_definite = np.zeros(mass.shape[0])
+  return (is_symmetric & is_positive_definite).all()

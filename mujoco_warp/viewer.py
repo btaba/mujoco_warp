@@ -34,6 +34,8 @@ _CLEAR_KERNEL_CACHE = flags.DEFINE_bool("clear_kernel_cache", False, "Clear kern
 _ENGINE = flags.DEFINE_enum("engine", "mjwarp", ["mjwarp", "mjc"], "Simulation engine")
 _CONE = flags.DEFINE_enum("cone", "pyramidal", ["pyramidal", "elliptic"], "Friction cone type")
 _LS_PARALLEL = flags.DEFINE_bool("ls_parallel", False, "Engine solver with parallel linesearch")
+_NWORLD = flags.DEFINE_integer("nworld", 1, "number of worlds")
+_DISPLAY_WORLD_ID = flags.DEFINE_integer("display_nworld_idx", 0, "nworld idx")
 _VIEWER_GLOBAL_STATE = {
   "running": True,
   "step_once": False,
@@ -87,7 +89,7 @@ def _main(argv: Sequence[str]) -> None:
     mjm_hash = pickle.dumps(mjm)
     m = mjwarp.put_model(mjm)
     m.opt.ls_parallel = _LS_PARALLEL.value
-    d = mjwarp.put_data(mjm, mjd)
+    d = mjwarp.put_data(mjm, mjd, nworld=_NWORLD.value)
 
     if _CLEAR_KERNEL_CACHE.value:
       wp.clear_kernel_cache()
@@ -127,7 +129,7 @@ def _main(argv: Sequence[str]) -> None:
           wp.capture_launch(graph)
           wp.synchronize()
 
-        mjwarp.get_data_into(mjd, mjm, d)
+        mjwarp.get_data_into(mjd, mjm, d, _DISPLAY_WORLD_ID.value)
 
       viewer.sync()
 
