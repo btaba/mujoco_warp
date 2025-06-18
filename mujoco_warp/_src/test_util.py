@@ -192,15 +192,13 @@ def benchmark(
       else:
         trace = tracer.trace()
 
-      # if measure_alloc or measure_solver_niter:
-      wp.synchronize()
+      if measure_alloc or measure_solver_niter:
+        wp.synchronize()
 
-      cond = are_spd(d.qM.numpy())
-      print(i)
-      if not cond:
-        import IPython
-
-        IPython.embed(user_ns=dict(globals(), **locals()))
+      # cond = are_spd(d.qM.numpy())
+      # print(i)
+      # if not cond:
+      #   import IPython; IPython.embed(user_ns=dict(globals(), **locals()))
 
       if measure_alloc:
         ncon.append(d.ncon.numpy()[0])

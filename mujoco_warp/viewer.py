@@ -134,6 +134,7 @@ def _main(argv: Sequence[str]) -> None:
       viewer.sync()
 
       elapsed = time.time() - start
+      print("Elapsed time: ", elapsed)
       if elapsed < mjm.opt.timestep:
         time.sleep(mjm.opt.timestep - elapsed)
 

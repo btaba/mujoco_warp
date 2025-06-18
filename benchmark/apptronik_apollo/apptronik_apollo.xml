@@ -22,7 +22,7 @@
         </default>
         <default class="collision">
             <!-- we turn these back on to be default -->
-            <geom contype="1" conaffinity="1" group="3" condim="3" rgba="0 1 0 0.4"/>
+            <geom contype="1" conaffinity="1" group="0" condim="3" rgba="0 1 0 0.4"/>
         </default>
     </default>
 

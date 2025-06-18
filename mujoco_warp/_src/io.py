@@ -1267,6 +1267,11 @@ def get_data_into(result: mujoco.MjData, mjm: mujoco.MjModel, d: types.Data, idx
   ncon = d.ncon.numpy()[0]
   nefc = d.nefc.numpy()[0]
 
+  if len(d.qpos.shape) > 1:
+    assert len(d.qpos.shape) == 2
+    ncon = ncon // d.qpos.shape[0]
+    nefc = nefc // d.qpos.shape[0]
+
   if ncon != result.ncon or nefc != result.nefc:
     mujoco._functions._realloc_con_efc(result, ncon=ncon, nefc=nefc)
 
