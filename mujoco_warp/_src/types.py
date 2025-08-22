@@ -600,6 +600,7 @@ class Option:
   sdf_initpoints: int
   sdf_iterations: int
   run_collision_detection: bool  # warp only
+  legacy_gjk: bool  # warp only
 
 
 @dataclasses.dataclass

@@ -1,6 +1,10 @@
 <mujoco model="aloha with pot">
-  <compiler autolimits="true" boundmass="0.01" boundinertia="9.9999999999999995e-07" angle="radian"/>
-  <option impratio="10" cone="elliptic">
+  <compiler autolimits="true" boundmass="0.01" boundinertia="9.9999999999999995e-05" angle="radian"/>
+        <custom>
+          <numeric data="1000" name="max_contact_points"/>
+          <numeric data="100" name="max_geom_pairs"/>
+        </custom>
+  <option impratio="1" iterations="10" ls_iterations="10">
     <flag multiccd="enable"/>
   </option>
   <visual>
@@ -11,6 +15,7 @@
   </visual>
   <statistic meansize="0.050000000000000003" extent="0.59999999999999998" center="0 -0.10000000000000001 0.20000000000000001"/>
   <default>
+    <mesh maxhullvert="32"/>
     <default class="/">
       <default class="frame">
         <geom type="mesh" group="1" material="black"/>
@@ -58,7 +63,7 @@
         <default class="collision">
           <geom type="mesh" group="3"/>
           <default class="finger_collision">
-            <geom condim="4" friction="1 0.0050000000000000001 0.0001" solref="0.01 1" solimp="2 1 0.01"/>
+            <geom  friction="1 0.0050000000000000001 0.0001" solref="0.01 1" solimp="2 1 0.01"/>
           </default>
           <default class="sphere_collision">
             <geom type="sphere" size="0.00059999999999999995" rgba="1 0 0 1"/>

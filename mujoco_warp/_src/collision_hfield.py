@@ -75,14 +75,23 @@ def _hfield_overlap_range(
   bound_radius = geom_rbound[worldid, geomid] + geom_margin[worldid, geomid]
 
   # calculate grid resolution
-  x_scale = 2.0 * size[0] / float(ncol - 1)
-  y_scale = 2.0 * size[1] / float(nrow - 1)
+  x_scale = 2.0 * size[0]
+  if ncol > 1:
+    x_scale /= float(ncol - 1)
+
+  y_scale = 2.0 * size[1]
+  if nrow > 1:
+    y_scale /= float(nrow - 1)
 
   # calculate min/max grid coordinates that could contain the object
-  min_i = wp.max(0, int((local_pos[0] - bound_radius + size[0]) / x_scale))
-  max_i = wp.min(ncol - 2, int((local_pos[0] + bound_radius + size[0]) / x_scale) + 1)
-  min_j = wp.max(0, int((local_pos[1] - bound_radius + size[1]) / y_scale))
-  max_j = wp.min(nrow - 2, int((local_pos[1] + bound_radius + size[1]) / y_scale) + 1)
+  # min_i = wp.max(0, int((local_pos[0] - bound_radius + size[0]) / x_scale))
+  # max_i = wp.min(ncol - 2, int((local_pos[0] + bound_radius + size[0]) / x_scale) + 1)
+  # min_j = wp.max(0, int((local_pos[1] - bound_radius + size[1]) / y_scale))
+  # max_j = wp.min(nrow - 2, int((local_pos[1] + bound_radius + size[1]) / y_scale) + 1)
+  min_i = wp.max(0, int(wp.floor((local_pos[0] - bound_radius + size[0]) / x_scale)))
+  max_i = wp.min(ncol - 2, int(wp.floor((local_pos[0] + bound_radius + size[0]) / x_scale)) + 1)
+  min_j = wp.max(0, int(wp.floor((local_pos[1] - bound_radius + size[1]) / y_scale)))
+  max_j = wp.min(nrow - 2, int(wp.floor((local_pos[1] + bound_radius + size[1]) / y_scale)) + 1)
 
   return min_i, min_j, max_i, max_j
 
@@ -131,8 +140,13 @@ def hfield_triangle_prism(
   col = (hftri_index // 2) % (ncol - 1)
 
   # calculate vertices in 2D grid
-  x_scale = 2.0 * size[0] / float(ncol - 1)
-  y_scale = 2.0 * size[1] / float(nrow - 1)
+  x_scale = 2.0 * size[0]
+  if ncol > 1:
+    x_scale /= float(ncol - 1)
+
+  y_scale = 2.0 * size[1]
+  if nrow > 1:
+    y_scale /= float(nrow - 1)
 
   # grid coordinates (i, j) for triangle corners
   i0 = col
@@ -152,6 +166,10 @@ def hfield_triangle_prism(
   z01 = hfield_data[base_addr + j1 * ncol + i0]
   z10 = hfield_data[base_addr + j0 * ncol + i1]
   z11 = hfield_data[base_addr + j1 * ncol + i1]
+  # z00 = hfield_data[base_addr + i0 * nrow + j0]
+  # z01 = hfield_data[base_addr + i0 * nrow + j1]
+  # z10 = hfield_data[base_addr + i1 * nrow + j0]
+  # z11 = hfield_data[base_addr + i1 * nrow + j1]
 
   # scale heights from range [0, 1] to [0, z_top]
   z_top = size[2]
@@ -199,23 +217,58 @@ def hfield_prism_vertex(prism: wp.mat33, vert_index: int) -> wp.vec3:
   Returns:
       The 3D coordinates of the requested vertex
   """
-  if vert_index == 0 or vert_index == 1:
-    return prism[vert_index]  # first two vertices stored directly
+  # if vert_index == 0 or vert_index == 1:
+  #   return prism[vert_index]  # first two vertices stored directly
 
-  if vert_index == 2:  # third vertex
-    if prism[2][0] == 0:  # even triangle (i, j+1)
-      return wp.vec3(prism[0][0], prism[1][1], prism[2][1])
-    else:  # odd triangle (i+1, j)
-      return wp.vec3(prism[1][0], prism[0][1], prism[2][1])
+  # if vert_index == 2:  # third vertex
+  #   if prism[2][0] == 0:  # even triangle (i, j+1)
+  #     return wp.vec3(prism[0][0], prism[1][1], prism[2][1])
+  #   else:  # odd triangle (i+1, j)
+  #     return wp.vec3(prism[1][0], prism[0][1], prism[2][1])
 
-  if vert_index == 3 or vert_index == 4:  # bottom vertices below 0 and 1
-    return wp.vec3(prism[vert_index - 3][0], prism[vert_index - 3][1], prism[2][2])
+  # if vert_index == 3 or vert_index == 4:  # bottom vertices below 0 and 1
+  #   return wp.vec3(prism[vert_index - 3][0], prism[vert_index - 3][1], prism[2][2])
 
-  if vert_index == 5:  # bottom vertex below 2
-    if prism[2][0] == 0:  # even triangle
-      return wp.vec3(prism[0][0], prism[1][1], prism[2][2])
-    else:  # odd triangle
-      return wp.vec3(prism[1][0], prism[0][1], prism[2][2])
+  # if vert_index == 5:  # bottom vertex below 2
+  #   if prism[2][0] == 0:  # even triangle
+  #     return wp.vec3(prism[0][0], prism[1][1], prism[2][2])
+  #   else:  # odd triangle
+  #     return wp.vec3(prism[1][0], prism[0][1], prism[2][2])
+  # Determine which of the three unique top vertices (0, 1, or 2) is needed.
+  is_bottom_vertex = vert_index < 3
+
+  # Determine the corresponding top vertex ID (0, 1, or 2)
+  top_vertex_id = int(0)
+  if is_bottom_vertex:
+    # --- FIX: Remap bottom indices to match JAX's [p1, p3, p2] ordering ---
+    if vert_index == 0:
+      top_vertex_id = 0  # Bottom[0] uses Top[0]'s data (p1)
+    elif vert_index == 1:
+      top_vertex_id = 2  # Bottom[1] uses Top[2]'s data (p3)
+    else:  # vert_index == 2
+      top_vertex_id = 1  # Bottom[2] uses Top[1]'s data (p2)
+  else:
+    # Top vertices are a direct mapping (vert_index 3 -> top_id 0, etc.)
+    top_vertex_id = vert_index - 3
+
+  # Decompress the requested top vertex's 3D coordinates based on its ID
+  top_v = wp.vec3(0.0)
+  if top_vertex_id == 0:
+    top_v = prism[0]
+  elif top_vertex_id == 1:
+    top_v = prism[1]
+  else:  # top_vertex_id == 2
+    is_odd_triangle = prism[2][0] != 0.0
+    if is_odd_triangle:  # odd triangle (i+1, j)
+      top_v = wp.vec3(prism[1][0], prism[0][1], prism[2][1])
+    else:  # even triangle (i, j+1)
+      top_v = wp.vec3(prism[0][0], prism[1][1], prism[2][1])
+
+  # Return either the top vertex or its projection on the bottom plane
+  if is_bottom_vertex:
+    return wp.vec3(top_v[0], top_v[1], prism[2][2])
+  else:
+    return top_v
 
 
 @wp.kernel
@@ -324,7 +377,7 @@ def _hfield_midphase(
 
       # add both triangles from this cell
       for t in range(2):
-        if i == 0 and j == 0 and t == 0:
+        if i == min_i and j == min_j and t == 0:
           # reuse the initial pair for the 1st triangle
           new_pairid = pairid
         else:

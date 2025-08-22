@@ -45,6 +45,7 @@ class EngineOptions(enum.IntEnum):
   C = 1
 
 
+_LEGACY_GJK = False
 _CLEAR_KERNEL_CACHE = flags.DEFINE_bool("clear_kernel_cache", False, "Clear kernel cache (to calculate full JIT time)")
 _ENGINE = flags.DEFINE_enum_class("engine", EngineOptions.WARP, EngineOptions, "Simulation engine")
 _NCONMAX = flags.DEFINE_integer("nconmax", None, "Maximum number of contacts.")
@@ -152,13 +153,14 @@ def _main(argv: Sequence[str]) -> None:
     )
     print(f"MuJoCo C simulating with dt = {mjm.opt.timestep:.3f}...")
   else:
-    wp.config.quiet = flags.FLAGS["verbosity"].value < 1
+    # wp.config.quiet = flags.FLAGS["verbosity"].value < 1
     wp.init()
     if _CLEAR_KERNEL_CACHE.value:
       wp.clear_kernel_cache()
 
     with wp.ScopedDevice(_DEVICE.value):
       m = mjw.put_model(mjm)
+      m.opt.legacy_gjk = _LEGACY_GJK
       _override(m)
       mjm_hash = pickle.dumps(mjm)
       broadphase, filter = mjw.BroadphaseType(m.opt.broadphase).name, mjw.BroadphaseFilter(m.opt.broadphase_filter).name
@@ -198,6 +200,7 @@ def _main(argv: Sequence[str]) -> None:
         if hash != mjm_hash:
           mjm_hash = hash
           m = mjw.put_model(mjm)
+          m.opt.legacy_gjk = _LEGACY_GJK
           graph = _compile_step(m, d)
 
         if _VIEWER_GLOBAL_STATE["running"]:
