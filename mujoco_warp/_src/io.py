@@ -46,10 +46,12 @@ def _max_npolygon(mjm: mujoco.MjModel) -> int:
 
 @wp.kernel
 def convert_texture_to_packed(
+  # In:
   size: int,
   nchannel: int,
   tex_data_uint8: wp.array(dtype=wp.uint8),
-  tex_data_packed: wp.array(dtype=wp.uint32),
+  # Out:
+  tex_data_packed_out: wp.array(dtype=wp.uint32),
 ):
   """
   Convert uint8 texture data to packed uint32 format for efficient sampling.
@@ -66,7 +68,7 @@ def convert_texture_to_packed(
   a = wp.uint8(255)  # Always use full alpha
 
   packed = (wp.uint32(a) << wp.uint32(24)) | (wp.uint32(r) << wp.uint32(16)) | (wp.uint32(g) << wp.uint32(8)) | wp.uint32(b)
-  tex_data_packed[tid] = packed
+  tex_data_packed_out[tid] = packed
 
 
 def _create_packed_texture_data(mjm: mujoco.MjModel) -> tuple[wp.array, wp.array]:
@@ -87,7 +89,7 @@ def _create_packed_texture_data(mjm: mujoco.MjModel) -> tuple[wp.array, wp.array
   wp.launch(
     convert_texture_to_packed,
     dim=(total_size,),
-    inputs=[total_size, mjm.tex_nchannel[0], wp.array(mjm.tex_data, dtype=wp.uint8), tex_data_packed]
+    inputs=[total_size, mjm.tex_nchannel[0], wp.array(mjm.tex_data, dtype=wp.uint8), tex_data_packed],
   )
 
   return tex_data_packed, wp.array(tex_adr_packed, dtype=int)
@@ -123,6 +125,12 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   geom_plugin_index = np.full_like(mjm.geom_type, -1)
 
   if mjm.nplugin > 0:
+    if (mjm.body_plugin != -1).any():
+      raise NotImplementedError("Body plugins not supported.")
+    if (mjm.actuator_plugin != -1).any():
+      raise NotImplementedError("Actuator plugins not supported.")
+    if (mjm.sensor_plugin != -1).any():
+      raise NotImplementedError("Sensor plugins not supported.")
     for i in range(len(mjm.geom_plugin)):
       if mjm.geom_plugin[i] != -1:
         p = mjm.geom_plugin[i]
@@ -449,6 +457,58 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   condim = np.concatenate((mjm.geom_condim, mjm.pair_dim))
   condim_max = np.max(condim) if len(condim) > 0 else 0
 
+  # collision sensors
+  is_collision_sensor = np.isin(
+    mjm.sensor_type, [mujoco.mjtSensor.mjSENS_GEOMDIST, mujoco.mjtSensor.mjSENS_GEOMNORMAL, mujoco.mjtSensor.mjSENS_GEOMFROMTO]
+  )
+  sensor_collision_adr = np.nonzero(is_collision_sensor)[0]
+  collision_sensor_adr = np.full(mjm.nsensor, -1)
+  collision_sensor_adr[sensor_collision_adr] = np.arange(len(sensor_collision_adr))
+
+  if is_collision_sensor.any():
+
+    def _collision_sensor_check(sensor_type, sensor_id, geom_type, err_msg):
+      for type_, id_ in zip(sensor_type, sensor_id):
+        if type_ == mujoco.mjtObj.mjOBJ_BODY:
+          geomnum = mjm.body_geomnum[id_]
+          geomadr = mjm.body_geomadr[id_]
+          for geomid in range(geomadr, geomadr + geomnum):
+            if mjm.geom_type[geomid] == geom_type:
+              raise NotImplementedError(err_msg)
+        elif type_ == mujoco.mjtObj.mjOBJ_GEOM:
+          if mjm.geom_type[id_] == geom_type:
+            raise NotImplementedError(err_msg)
+
+    sensor_collision_objtype = mjm.sensor_objtype[is_collision_sensor]
+    sensor_collision_objid = mjm.sensor_objid[is_collision_sensor]
+    sensor_collision_reftype = mjm.sensor_reftype[is_collision_sensor]
+    sensor_collision_refid = mjm.sensor_refid[is_collision_sensor]
+
+    _collision_sensor_check(
+      sensor_collision_objtype,
+      sensor_collision_objid,
+      mujoco.mjtGeom.mjGEOM_PLANE,
+      "Collision sensors with planes are not implemented.",
+    )
+    _collision_sensor_check(
+      sensor_collision_reftype,
+      sensor_collision_refid,
+      mujoco.mjtGeom.mjGEOM_PLANE,
+      "Collision sensors with planes are not implemented.",
+    )
+    _collision_sensor_check(
+      sensor_collision_objtype,
+      sensor_collision_objid,
+      mujoco.mjtGeom.mjGEOM_HFIELD,
+      "Collision sensors with height fields are not implemented.",
+    )
+    _collision_sensor_check(
+      sensor_collision_reftype,
+      sensor_collision_refid,
+      mujoco.mjtGeom.mjGEOM_HFIELD,
+      "Collision sensors with height fields are not implemented.",
+    )
+
   # render
   nmesh = mjm.nmesh
   # TODO: What is the best way to pass in the render options?
@@ -474,11 +534,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     indices = mjm.mesh_face[f_start:f_end]
     indices = indices.flatten()
 
-    mesh = wp.Mesh(
-      points=wp.array(points, dtype=wp.vec3),
-      indices=wp.array(indices, dtype=wp.int32),
-      bvh_constructor="sah"
-    )
+    mesh = wp.Mesh(points=wp.array(points, dtype=wp.vec3), indices=wp.array(indices, dtype=wp.int32), bvh_constructor="sah")
     REGISTRY[mesh.id] = mesh
     mesh_bvh_ids[i] = mesh.id
 
@@ -486,7 +542,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     pmax = points.max(axis=0)
     half = 0.5 * (pmax - pmin)
     mesh_bounds_size[i] = half
-  
+
   tex_data_packed, tex_adr_packed = _create_packed_texture_data(mjm)
 
   m = types.Model(
@@ -866,6 +922,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     ),
     sensor_rangefinder_adr=wp.array(sensor_rangefinder_adr, dtype=int),
     rangefinder_sensor_adr=wp.array(rangefinder_sensor_adr, dtype=int),
+    collision_sensor_adr=wp.array(collision_sensor_adr, dtype=int),
     sensor_touch_adr=wp.array(
       np.nonzero(mjm.sensor_type == mujoco.mjtSensor.mjSENS_TOUCH)[0],
       dtype=int,
@@ -950,13 +1007,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     tex_data=tex_data_packed,
     tex_height=wp.array(mjm.tex_height, dtype=int),
     tex_width=wp.array(mjm.tex_width, dtype=int),
-
   )
 
   return m
 
 
-def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: int = -1, bvh_ngeom: int = 1, pixels: int = 1) -> types.Data:
+def make_data(
+  mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: int = -1, bvh_ngeom: int = 1, pixels: int = 1
+) -> types.Data:
   """
   Creates a data object on device.
 
