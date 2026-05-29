@@ -1094,6 +1094,7 @@ dependencies = [
     { name = "mujoco" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pillow" },
     { name = "warp-lang" },
 ]
 
@@ -1130,6 +1131,7 @@ requires-dist = [
     { name = "mujoco", specifier = ">=3.8.0", index = "https://py.mujoco.org/" },
     { name = "mujoco", marker = "extra == 'dev'", specifier = ">=3.8.0.dev0", index = "https://py.mujoco.org/" },
     { name = "numpy" },
+    { name = "pillow", specifier = ">=12.2.0" },
     { name = "pillow", marker = "extra == 'dev'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pygls", marker = "extra == 'dev'", specifier = ">=1.0.0,<2.0.0" },

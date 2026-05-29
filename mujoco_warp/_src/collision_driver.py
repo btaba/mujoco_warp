@@ -763,7 +763,7 @@ def _narrowphase(m: Model, d: Data, ctx: CollisionContext):
   if m.has_sdf_geom:
     sdf_narrowphase(m, d, ctx)
 
-  if m.nflex > 0:
+  if m.nflex > 0 and not (m.opt.disableflags & DisableBit.NATIVECCD):
     flex_narrowphase(m, d)
 
 

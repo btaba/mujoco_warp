@@ -43,6 +43,7 @@ from mujoco_warp._src.types import JointType
 from mujoco_warp._src.types import Model
 from mujoco_warp._src.types import TileSet
 from mujoco_warp._src.types import TrnType
+
 from mujoco_warp._src.types import vec10f
 from mujoco_warp._src.warp_util import cache_kernel
 from mujoco_warp._src.warp_util import event_scope
@@ -656,7 +657,8 @@ def fwd_position(m: Model, d: Data, factorize: bool = True):
   smooth.kinematics(m, d)
   smooth.com_pos(m, d)
   smooth.camlight(m, d)
-  smooth.flex(m, d)
+  if not (m.opt.disableflags & DisableBit.NATIVECCD):
+    smooth.flex(m, d)
   smooth.tendon(m, d)
   smooth.crb(m, d)
   smooth.tendon_armature(m, d)

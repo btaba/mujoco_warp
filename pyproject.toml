@@ -31,8 +31,13 @@ dependencies = [
     "etils[epath]",
     "mujoco>=3.8.0",
     "numpy",
+    "pillow>=12.2.0",
     "warp-lang>=1.13",
 ]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
 
 [[tool.uv.index]]
 name = "nvidia"
